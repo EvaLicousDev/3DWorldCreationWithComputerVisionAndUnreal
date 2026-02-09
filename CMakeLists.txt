@@ -1,6 +1,5 @@
 ﻿# CMakeList.txt : CMake project for OpenCVLegoMapScannerV1, include source and define
 # project specific logic here.
-#
 cmake_minimum_required (VERSION 3.10)
 
 # Enable Hot Reload for MSVC compilers if supported.
@@ -9,13 +8,17 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("OpenCVLegoMapScannerV1")
+project (OpenCVLegoMapScannerV1)
 
-# Add source to this project's executable.
-add_executable (OpenCVLegoMapScannerV1 "OpenCVLegoMapScannerV1.cpp" "OpenCVLegoMapScannerV1.h")
+#computer vision library+
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_DIR})
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET OpenCVLegoMapScannerV1 PROPERTY CXX_STANDARD 20)
-endif()
+# Add source to this project's executable and additional files
+# Include all 
+add_subdirectory(src)
+add_executable (OpenCVLegoMapScannerV1 "OpenCVLegoMapScannerV1.cpp")
+target_link_libraries(OpenCVLegoMapScannerV1 PUBLIC ${OpenCV_LIBS} ProcessingLib)
 
-# TODO: Add tests and install targets if needed.
+#specify including subdirectories for parent projects
+target_include_directories(OpenCVLegoMapScannerV1 PUBLIC)
