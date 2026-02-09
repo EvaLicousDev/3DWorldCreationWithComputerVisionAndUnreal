@@ -13,15 +13,15 @@ using namespace PreProcessor;
 
 int main()
 {
-	std::cout << "Starting Preprocessing" << std::endl;
-	const char* filepath = "";
-	cv::Mat image = cv::imread(filepath);
+    std::cout << "Starting Preprocessing" << std::endl;
+    const char* filepath = "";
+    cv::Mat image = cv::imread(filepath);
 
-	std::unique_ptr<ImageProcessor> preProcessor = std::make_unique<ImageProcessor>(image);
-	cv::Mat processed = preProcessor->naiveRgbColourSpaceReduction(preProcessor->getMainImage(), 128);
-	processed = preProcessor->sharpen2Dedges(processed); 
-	preProcessor->display(processed, 500);
+    std::unique_ptr<ImageProcessor> preProcessor = std::make_unique<ImageProcessor>(image);
+    cv::Mat processed = preProcessor->naiveRgbColourSpaceReduction(preProcessor->getMainImage(), 128);
+    processed = preProcessor->sharpen2Dedges(processed); 
+    preProcessor->display(processed, 500);
 
-	cout << "---------------------End--------------------------------" << endl;
-	return 0;
+    cout << "---------------------End--------------------------------" << endl;
+    return 0;
 }
