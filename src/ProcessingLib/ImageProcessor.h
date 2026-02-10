@@ -91,13 +91,18 @@ namespace PreProcessor
 
         void     debugInfo(cv::Mat& image);
 
-        void     display(cv::Mat& image, bool sizeDown = true);
-        void     display(cv::Mat& image,  int pixels);
+        void     display(cv::Mat& image, const char* frameName, bool sizeDown = true);
+        void     display(cv::Mat& image, const char* frameName, int pixels);
         void     displayRGBChannels();
         void     displayHSVChannels(); 
         void     displayHSVChannelsAndOriginal(); 
         void     displayLABChannels();
         void     displayLUVChannels();
+
+        cv::Mat  getLuminance() { return image_Lumosity; }
+        cv::Mat  getAxis() { return image_Axis; }
+        cv::Mat  getBY() { return image_BlueYellow; }
+        cv::Mat  getGreen() { return image_G; }
 
     private:
         struct HistogramData

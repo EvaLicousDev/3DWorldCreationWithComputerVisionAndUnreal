@@ -132,17 +132,17 @@ cv::Mat PreProcessor::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& im
 }
 
 // Displays copy of image reference resized 
-void PreProcessor::ImageProcessor::display(cv::Mat& image, int pixels)
+void PreProcessor::ImageProcessor::display(cv::Mat& image, const char* displayName,int pixels)
 {
     if (!this->in_image.empty())
     {
         this->debugInfo(image);
-        cv::namedWindow("Processed");
+        cv::namedWindow(displayName);
         // Create an empty Mat object for the resized image
         cv::Mat resizedImage;
         // Resize the image
         cv::resize(image, resizedImage, cv::Size(pixels, pixels));
-        cv::imshow("Processed", resizedImage);
+        cv::imshow(displayName, resizedImage);
         cv::waitKey(0);
     }
     else
@@ -153,21 +153,21 @@ void PreProcessor::ImageProcessor::display(cv::Mat& image, int pixels)
 }
 
 // Displays image reference. By defualt it sizes the picture down to 65% of it's original size. This can be toggled off by pasig in "false"
-void PreProcessor::ImageProcessor::display(cv::Mat& image, bool sizeDown /* = true */)
+void PreProcessor::ImageProcessor::display(cv::Mat& image, const char* displayName, bool sizeDown /* = true */)
 {
     if (!this->in_image.empty())
     {
         this->debugInfo(image);
-        cv::namedWindow("Processed");
+        cv::namedWindow(displayName);
         if (sizeDown)
         {
             cv::Mat resizedImage;
             cv::resize(image, resizedImage, cv::Size(), 0.65, 0.65, cv::INTER_LINEAR);
-            cv::imshow("Processed", resizedImage);
+            cv::imshow(displayName, resizedImage);
             cv::waitKey(0);
             return; 
         }
-        cv::imshow("Processed", image);
+        cv::imshow(displayName, image);
         cv::waitKey(0);
     }
     else
@@ -313,12 +313,12 @@ void PreProcessor::ImageProcessor::updateHSVChannelsWithProcessed(cv::Mat& proce
 {
     std::vector<cv::Mat> rgb_channels;
     cv::split(processed, rgb_channels);
-    image_R = rgb_channels[0];
+    image_R = rgb_channels[2];
     image_G = rgb_channels[1];
-    image_B = rgb_channels[2];
+    image_B = rgb_channels[0];
 
     cv::Mat hsv;
-    cv::cvtColor(processed, hsv, cv::COLOR_RGB2HSV);
+    cv::cvtColor(processed, hsv, cv::COLOR_BGR2HSV);
     std::vector<cv::Mat> hsv_channels;
     cv::split(hsv, hsv_channels);
     image_hue = hsv_channels[0];
@@ -327,7 +327,7 @@ void PreProcessor::ImageProcessor::updateHSVChannelsWithProcessed(cv::Mat& proce
 
     //seperate and retrieve lap colour channels
     cv::Mat lab;
-    cv::cvtColor(processed, lab, cv::COLOR_RGB2Lab);
+    cv::cvtColor(processed, lab, cv::COLOR_BGR2Lab);
     std::vector<cv::Mat> lab_channels;
     cv::split(lab, lab_channels);
     image_Lumosity = lab_channels[0];
@@ -336,7 +336,7 @@ void PreProcessor::ImageProcessor::updateHSVChannelsWithProcessed(cv::Mat& proce
 
     //seperate and retrieve luv colour channels
     cv::Mat luv;
-    cv::cvtColor(processed, luv, cv::COLOR_RGB2Luv);
+    cv::cvtColor(processed, luv, cv::COLOR_BGR2Luv);
     std::vector<cv::Mat> luv_channels;
     cv::split(luv, luv_channels);
     image_Lumosity2 = luv_channels[0];
