@@ -8,6 +8,9 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/core.hpp>
 
+//project includes
+#include "ColourSpaceVisualiser.h"
+
 namespace PreProcessor
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
@@ -39,99 +42,60 @@ namespace PreProcessor
 
     public:
         ImageProcessor(const cv::Mat& loadedImage)
-            : in_image(loadedImage)
+            : in_image(std::make_shared<cv::Mat>(loadedImage))
         {
-            std::vector<cv::Mat> rgb_channels;
-            cv::split(in_image, rgb_channels);
-            image_R = rgb_channels[0];
-            image_G = rgb_channels[1];
-            image_B = rgb_channels[2];
-
-            //seperate and retrieve hsv colour channels
-            cv::Mat hsv; 
-            cv::cvtColor(in_image, hsv, cv::COLOR_RGB2HSV);
-            std::vector<cv::Mat> hsv_channels;
-            cv::split(hsv, hsv_channels);
-            image_hue = hsv_channels[0];
-            image_saturation = hsv_channels[1];
-            image_value = hsv_channels[2]; 
-
-            //seperate and retrieve lap colour channels
-            cv::Mat lab;
-            cv::cvtColor(in_image, lab, cv::COLOR_RGB2Lab);
-            std::vector<cv::Mat> lab_channels;
-            cv::split(lab, lab_channels);
-            image_Lumosity = lab_channels[0];
-            image_Axis = lab_channels[1];
-            image_BlueYellow = lab_channels[2];
-
-            //seperate and retrieve luv colour channels
-            cv::Mat luv;
-            cv::cvtColor(in_image, luv, cv::COLOR_RGB2Luv);
-            std::vector<cv::Mat> luv_channels;
-            cv::split(luv, luv_channels);
-            image_Lumosity2 = luv_channels[0];
-            image_U = luv_channels[1];
-            image_V = luv_channels[2];
+            if (!in_image->empty())
+            {
+                visualiserInstance = std::make_unique<ColourSpaceVisualiser>(in_image); 
+            }
         }
 
+        cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
+        cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
+        cv::Mat applyCannyToBGR(cv::Mat& blurredBGR);
+        cv::Mat applyCannyTo1D(cv::Mat& blurredGrey, int threshold);
+        void    setContouringThresholds(cv::Mat& blurredGreyscale);
+        void    getContourData(cv::Mat& allEdgesAdded, bool drawContours);
+
+        cv::Mat reseizeImage(cv::Mat& image); 
+        cv::Mat createThresholdMask(cv::Mat& greyImage);
+        cv::Mat backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold); 
+        
         //image processing functions using pixle wise operations
         cv::Mat naiveRgbColourSpaceReduction(cv::Mat& image,   int divideBy = 16);
         cv::Mat naiveRgbColourSpaceReduction2(cv::Mat& image,  int divideBy = 16);
         cv::Mat bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy = 16);
         cv::Mat rgbColourSpaceReductionWithIt(cv::Mat& image,  int divideBy = 16);
 
-        void updateHSVChannelsWithProcessed(cv::Mat& processed); 
-
         cv::Mat sharpen2Dedges(cv::Mat& image); 
         int     getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const; 
 
         //debug functions for development
-        cv::Mat& getMainImage() { return in_image; }
+        cv::Mat& getMainImage() { return *in_image; }
 
         void     debugInfo(cv::Mat& image);
-
-        void     display(cv::Mat& image, const char* frameName, bool sizeDown = true);
-        void     display(cv::Mat& image, const char* frameName, int pixels);
-        void     displayRGBChannels();
-        void     displayHSVChannels(); 
-        void     displayHSVChannelsAndOriginal(); 
-        void     displayLABChannels();
-        void     displayLUVChannels();
-
-        cv::Mat  getLuminance() { return image_Lumosity; }
-        cv::Mat  getAxis() { return image_Axis; }
-        cv::Mat  getBY() { return image_BlueYellow; }
-        cv::Mat  getGreen() { return image_G; }
+        void     displayAllColourModels(); 
 
     private:
-        struct HistogramData
-        {
-            
-        };
+        cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
 
-        cv::Mat in_image; 
+        std::shared_ptr<cv::Mat> in_image = nullptr; 
+        std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
 
-        //RGB channels
-        cv::Mat image_R; 
-        cv::Mat image_G; 
-        cv::Mat image_B; 
+        std::shared_ptr<cv::Mat> image_L = nullptr;
+        std::shared_ptr<cv::Mat> image_A = nullptr;
+        std::shared_ptr<cv::Mat> image_B = nullptr;
+        std::shared_ptr<cv::Mat> image_S = nullptr;
 
-        //HSV channels 
-        cv::Mat image_hue; 
-        cv::Mat image_saturation; 
-        cv::Mat image_value; 
+        std::shared_ptr<std::vector<std::vector<cv::Point>>> m_contours_poly = nullptr;
+        std::shared_ptr<std::vector<cv::Rect>>               m_boundRect     = nullptr;
 
-        //LAB channels
-        cv::Mat image_Lumosity; 
-        cv::Mat image_Axis; 
-        cv::Mat image_BlueYellow; 
+        cv::Mat drawenContours;
+        cv::Rect* m_biggestRect = nullptr; 
 
-        //Luv channels
-        cv::Mat image_Lumosity2;
-        cv::Mat image_U;
-        cv::Mat image_V;
-
+        double controurThreshMax = 0;
+        double controurThreshMin = 0;
+        double controurThreshMiddle = 0;
         //cv::Mat createColourLocationImageBW(int maxDistance, const cv::Vec3b& tragetColour);
 
     };
