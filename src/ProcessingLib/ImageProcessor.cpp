@@ -1,4 +1,6 @@
 #include "ImageProcessor.h"
+#include "ColourSpaceVisualiser.h"
+#include "SingleChannelHistogram.h"
 
 //std includes
 #include <iostream>
@@ -6,6 +8,143 @@
 //computer vision library incudes
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+
+void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool drawContours)
+{
+    cv::Mat contours;
+    cv::findContours(allEdgesAdded, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+    std::vector<std::vector<cv::Point>> contours_poly(contours.size());
+    std::vector<cv::Rect> boundRect(contours.size());
+    std::vector<cv::Rect> filteredRect(contours.size());
+
+    if (drawContours)
+    {
+        drawenContours.release();
+        drawenContours = cv::Mat(allEdgesAdded.cols, allEdgesAdded.rows, CV_8UC1);
+        for (size_t i = 0; i < contours.size(); i++)
+        {
+            approxPolyDP(contours[i], contours_poly[i], 4, true);
+            boundRect[i] = boundingRect(contours_poly[i]);
+        }
+    }
+
+    int numBiggest = 0;
+    int idBiggest = 0;
+    for (int i = 0; i < boundRect.size(); i++) {
+        if (boundRect[i].width > numBiggest) {
+            numBiggest = boundRect[i].width;
+            idBiggest = i;
+        }
+    }
+
+    double biggestWidth = boundRect[idBiggest].width;
+    double about1Square = biggestWidth / 32;
+    // about1Square = about1Square * 0.95; 
+
+    for (size_t i = 0; i < contours.size(); i++)
+    {
+        if (boundRect[i].width >= about1Square && boundRect[i].height >= about1Square)
+        {
+            filteredRect.emplace_back(boundRect[i]);
+        }
+    }
+
+    this->m_boundRect = std::make_shared<std::vector<cv::Rect>> (filteredRect);
+    this->m_contours_poly = std::make_shared<std::vector<std::vector<cv::Point>>>(contours_poly);
+}
+
+cv::Mat PreProcessor::ImageProcessor::customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3)
+{
+    return bestEdges(input1, input2, input3); 
+}
+
+void PreProcessor::ImageProcessor::setContouringThresholds(cv::Mat& blurredGreyscale)
+{
+    normalize(blurredGreyscale, blurredGreyscale, 0, 255, cv::NORM_MINMAX);
+    cv::minMaxIdx(blurredGreyscale, &controurThreshMin, &controurThreshMax, 0, 0);
+    controurThreshMiddle = (controurThreshMin + controurThreshMax) / 2;
+    double maxThreshCan = controurThreshMiddle * 1.5;
+    if (maxThreshCan > 255)
+        maxThreshCan = 255;
+    double minThreshCan = maxThreshCan * 0.9;
+}
+
+cv::Mat PreProcessor::ImageProcessor::applyCannyToBGR(cv::Mat& blurredBGR)
+{
+    cv::Mat blurredGreyscale; 
+    cv::cvtColor(blurredBGR, blurredGreyscale, cv::COLOR_BGR2GRAY); 
+    setContouringThresholds(blurredGreyscale);
+    cv::Canny(blurredGreyscale, blurredGreyscale, controurThreshMin, controurThreshMax);
+    return blurredGreyscale; 
+}
+
+cv::Mat PreProcessor::ImageProcessor::applyCannyTo1D(cv::Mat& blurredGrey, int threshold)
+{
+    setContouringThresholds(blurredGrey);
+    cv::Canny(blurredGrey, blurredGrey, threshold, controurThreshMax);
+    return blurredGrey;
+}
+
+cv::Mat PreProcessor::ImageProcessor::applySobel(cv::Mat& blurredBGR, int k)
+{
+    cv::Mat blurredGreyscale; 
+    cv::Mat sobelx, sobely, gradient;
+    cv::cvtColor(blurredBGR, blurredGreyscale, cv::COLOR_BGR2GRAY);
+    cv::Sobel(blurredGreyscale, sobelx, CV_64F, 1, 0, k);
+    cv::Sobel(blurredGreyscale, sobely, CV_64F, 0, 1, k);
+    cv::magnitude(sobelx, sobely, gradient);
+    // Convert to 8-bit image
+    cv::convertScaleAbs(gradient, gradient);
+    return gradient;
+}
+
+cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
+{
+    auto roiHistogramData = Histogram::SingleChannelHistogram(regionOfInterest); 
+    auto roiHistogram = roiHistogramData.getHistogram();
+    cv::normalize(roiHistogram, roiHistogram, 1.0);
+    
+    auto lookUp = cv::Mat(); 
+    auto images[1] = {inputImage};
+    auto channels[1] = {0};
+    float ranges[2] = {0.0, 255.0}; //should be 256?
+    cv::calcBackProject(images, 1, 0, channels, lookUp, ranges, 255.0);
+    //PreProcessor::ColourSpaceVisualiser::display(lookUp, "Backprojection", false); 
+    cv::threshold(lookUp, lookUp, threshold, 255, cv::THRESH_BINARY);
+    //PreProcessor::ColourSpaceVisualiser::display(lookUp, "Thresholded Backprojection", false);
+
+    return lookUp;
+}
+
+void PreProcessor::ImageProcessor::displayAllColourModels()
+{
+    if (this->visualiserInstance != nullptr)
+    {
+        visualiserInstance->displayRGBChannels();
+        visualiserInstance->displayHSVChannels();
+        visualiserInstance->displayLABChannels();
+        visualiserInstance->displayLUVChannels();
+    }
+}
+
+cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
+{
+    cv::Mat greyScale; 
+    cv::GaussianBlur(greyImage, greyScale, cv::Size(), 1.4);
+    cv::threshold(greyScale, greyScale, 150, 255, cv::ADAPTIVE_THRESH_MEAN_C);
+    return greyScale;
+}
+
+cv::Mat PreProcessor::ImageProcessor::reseizeImage(cv::Mat& image)
+{
+    auto numVerticalPixl = image.rows;
+    auto desiredSizeFactorVertical = numVerticalPixl / 500;
+    auto desiredSize = numVerticalPixl / desiredSizeFactorVertical;
+    float reseizeFactor = static_cast<float>(desiredSize) / static_cast<float>(numVerticalPixl);
+    cv::Mat resized;
+    cv::resize(image, resized, cv::Size(), reseizeFactor, reseizeFactor, cv::INTER_LINEAR);
+    return resized; 
+}
 
 // Dev function
 void PreProcessor::ImageProcessor::debugInfo(cv::Mat& image)
@@ -45,6 +184,41 @@ cv::Mat PreProcessor::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& ima
         (*it)[2] = (*it)[2] % divideBy + (divideBy / 2);
     }
     return image;
+}
+
+cv::Mat PreProcessor::ImageProcessor::bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges)
+{
+    cv::Mat output = cv::Mat(lumEdges.rows, lumEdges.cols, CV_8UC1);
+    //this->display(axEdges,"ax bot normalised");
+    cv::normalize(lumEdges, lumEdges, 100, 255, cv::NORM_MINMAX);
+    cv::normalize(axEdges, axEdges, 130, 255, cv::NORM_MINMAX);
+    cv::normalize(byEdges, byEdges, 130, 255, cv::NORM_MINMAX);
+
+    auto rows = output.rows;
+    auto cols = output.cols;
+    //loop over all pixels in the image and reduce colour value on each cannel
+    for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
+    {
+        auto colourChannelAdress = output.ptr<uchar>(rowIndex);
+        auto lumChannelAdress = lumEdges.ptr<uchar>(rowIndex);
+        auto axChannelAdress = axEdges.ptr<uchar>(rowIndex);
+        auto byChannelAdress = byEdges.ptr<uchar>(rowIndex);
+        for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
+        {
+            //colourChannelAdress[columnIndex] = cv::max(cv::max(lumChannelAdress[columnIndex], axChannelAdress[columnIndex]), byChannelAdress[columnIndex]);
+            colourChannelAdress[columnIndex] = (lumChannelAdress[columnIndex]+axChannelAdress[columnIndex]+byChannelAdress[columnIndex])/3;
+            if (colourChannelAdress[columnIndex] < 180)
+            {
+                colourChannelAdress[columnIndex] = 0;
+            }
+            //else
+            //{
+            //    colourChannelAdress[columnIndex] = 255;
+            //}
+        }
+    }
+    //cv::normalize(output,output, 0, 255, cv::NORM_MINMAX);
+    return output;
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
@@ -131,217 +305,12 @@ cv::Mat PreProcessor::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& im
     return image;
 }
 
-// Displays copy of image reference resized 
-void PreProcessor::ImageProcessor::display(cv::Mat& image, int pixels)
-{
-    if (!this->in_image.empty())
-    {
-        this->debugInfo(image);
-        cv::namedWindow("Processed");
-        // Create an empty Mat object for the resized image
-        cv::Mat resizedImage;
-        // Resize the image
-        cv::resize(image, resizedImage, cv::Size(pixels, pixels));
-        cv::imshow("Processed", resizedImage);
-        cv::waitKey(0);
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
-// Displays image reference. By defualt it sizes the picture down to 65% of it's original size. This can be toggled off by pasig in "false"
-void PreProcessor::ImageProcessor::display(cv::Mat& image, bool sizeDown /* = true */)
-{
-    if (!this->in_image.empty())
-    {
-        this->debugInfo(image);
-        cv::namedWindow("Processed");
-        if (sizeDown)
-        {
-            cv::Mat resizedImage;
-            cv::resize(image, resizedImage, cv::Size(), 0.65, 0.65, cv::INTER_LINEAR);
-            cv::imshow("Processed", resizedImage);
-            cv::waitKey(0);
-            return; 
-        }
-        cv::imshow("Processed", image);
-        cv::waitKey(0);
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
 //Function returns the absolute value between the three colour channels in a Vec3b object
 int PreProcessor::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const
 {
     return abs(colourIn[0] - tragetColour[0])
          + abs(colourIn[1] - tragetColour[1])
          + abs(colourIn[2] - tragetColour[2]); 
-}
-
-void PreProcessor::ImageProcessor::displayHSVChannels()
-{
-    if (!this->in_image.empty())
-    {
-        cv::namedWindow("Hue");
-        cv::namedWindow("Saturation");
-        cv::namedWindow("Value");
-
-        cv::Mat resizedHue;
-        cv::resize(image_hue, resizedHue, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Hue", resizedHue);
-
-        cv::Mat resizedSaturation;
-        cv::resize(image_saturation, resizedSaturation, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Saturation", resizedSaturation);
-
-        cv::Mat resizedValue;
-        cv::resize(image_value, resizedValue, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Value", resizedValue);
-
-        cv::waitKey(0);
-        return;
-
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
-
-void PreProcessor::ImageProcessor::displayLABChannels()
-{
-    if (!this->in_image.empty())
-    {
-        cv::namedWindow("Lumosity");
-        cv::namedWindow("Axis");
-        cv::namedWindow("B_Y");
-
-        cv::Mat resizedL;
-        cv::resize(image_Lumosity, resizedL, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Lumosity", resizedL);
-
-        cv::Mat resizedA;
-        cv::resize(image_Axis, resizedA, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Axis", resizedA);
-
-        cv::Mat resizedB;
-        cv::resize(image_BlueYellow, resizedB, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("B_Y", resizedB);
-
-        cv::waitKey(0);
-        return;
-
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
-
-void PreProcessor::ImageProcessor::displayLUVChannels()
-{
-    if (!this->in_image.empty())
-    {
-        cv::namedWindow("Lumosity2");
-        cv::namedWindow("U_Channel");
-        cv::namedWindow("V_Channel");
-
-        cv::Mat resizedL;
-        cv::resize(image_Lumosity2, resizedL, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Lumosity2", resizedL);
-
-        cv::Mat resizedU;
-        cv::resize(image_U, resizedU, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("U_Channel", resizedU);
-
-        cv::Mat resizedV;
-        cv::resize(image_V, resizedV, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("V_Channel", resizedV);
-
-        cv::waitKey(0);
-        return;
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
-void PreProcessor::ImageProcessor::displayRGBChannels()
-{
-    if (!this->in_image.empty())
-    {
-        cv::namedWindow("Red");
-        cv::namedWindow("Green");
-        cv::namedWindow("Blue");
-
-        cv::Mat resizedR;
-        cv::resize(image_R, resizedR, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Red", resizedR);
-
-        cv::Mat resizedG;
-        cv::resize(image_G, resizedG, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Green", resizedG);
-
-        cv::Mat resizedB2;
-        cv::resize(image_B, resizedB2, cv::Size(), 0.35, 0.35, cv::INTER_LINEAR);
-        cv::imshow("Blue", resizedB2);
-
-        cv::waitKey(0);
-        return;
-    }
-    else
-    {
-        std::cout << "Could not display image - please breakpoint and debug" << std::endl;
-        std::cin.get();
-    }
-}
-
-void PreProcessor::ImageProcessor::updateHSVChannelsWithProcessed(cv::Mat& processed)
-{
-    std::vector<cv::Mat> rgb_channels;
-    cv::split(processed, rgb_channels);
-    image_R = rgb_channels[0];
-    image_G = rgb_channels[1];
-    image_B = rgb_channels[2];
-
-    cv::Mat hsv;
-    cv::cvtColor(processed, hsv, cv::COLOR_RGB2HSV);
-    std::vector<cv::Mat> hsv_channels;
-    cv::split(hsv, hsv_channels);
-    image_hue = hsv_channels[0];
-    image_saturation = hsv_channels[1];
-    image_value = hsv_channels[2];
-
-    //seperate and retrieve lap colour channels
-    cv::Mat lab;
-    cv::cvtColor(processed, lab, cv::COLOR_RGB2Lab);
-    std::vector<cv::Mat> lab_channels;
-    cv::split(lab, lab_channels);
-    image_Lumosity = lab_channels[0];
-    image_Axis = lab_channels[1];
-    image_BlueYellow = lab_channels[2];
-
-    //seperate and retrieve luv colour channels
-    cv::Mat luv;
-    cv::cvtColor(processed, luv, cv::COLOR_RGB2Luv);
-    std::vector<cv::Mat> luv_channels;
-    cv::split(luv, luv_channels);
-    image_Lumosity2 = luv_channels[0];
-    image_U = luv_channels[1];
-    image_V = luv_channels[2];
 }
 
 //using the image which the class was initialised with, we determine the distance to pixels in the image to a target colour

@@ -9,6 +9,7 @@ if (POLICY CMP0141)
 endif()
 
 project (OpenCVLegoMapScannerV1)
+set( CMAKE_CXX_STANDARD 20 )
 
 #computer vision library+
 find_package(OpenCV REQUIRED)
@@ -17,8 +18,8 @@ include_directories(${OpenCV_DIR})
 # Add source to this project's executable and additional files
 # Include all 
 add_subdirectory(src)
-add_executable (OpenCVLegoMapScannerV1 "OpenCVLegoMapScannerV1.cpp")
-target_link_libraries(OpenCVLegoMapScannerV1 PUBLIC ${OpenCV_LIBS} ProcessingLib)
+add_executable (OpenCVLegoMapScannerV1 "OpenCVLegoMapScannerV1.cpp" "TestImages/RubbishToClean.h")
+target_link_libraries(OpenCVLegoMapScannerV1 PUBLIC ${OpenCV_LIBS} TemplateCodeLib ProcessingLib)
 
 #specify including subdirectories for parent projects
 target_include_directories(OpenCVLegoMapScannerV1 PUBLIC)
