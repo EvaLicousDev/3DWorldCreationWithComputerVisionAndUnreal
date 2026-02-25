@@ -1,17 +1,19 @@
 #include "ImageProcessor.h"
-#include "ColourSpaceVisualiser.h"
-#include "SingleChannelHistogram.h"
+#include "Histogram/SingleChannelHistogram.h"
 
 //std includes
 #include <iostream>
+#include <memory>
 
 //computer vision library incudes
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "ERRORs/ErrorOutput.h"
+
 void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool drawContours)
 {
-    cv::Mat contours;
+    std::vector<std::vector<cv::Point>> contours;
     cv::findContours(allEdgesAdded, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
     std::vector<std::vector<cv::Point>> contours_poly(contours.size());
     std::vector<cv::Rect> boundRect(contours.size());
@@ -29,7 +31,7 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
     }
 
     int numBiggest = 0;
-    int idBiggest = 0;
+    int idBiggest  = 0;
     for (int i = 0; i < boundRect.size(); i++) {
         if (boundRect[i].width > numBiggest) {
             numBiggest = boundRect[i].width;
@@ -39,7 +41,7 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
 
     double biggestWidth = boundRect[idBiggest].width;
     double about1Square = biggestWidth / 32;
-    // about1Square = about1Square * 0.95; 
+    about1Square = about1Square * 0.95; 
 
     for (size_t i = 0; i < contours.size(); i++)
     {
@@ -49,14 +51,15 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
         }
     }
 
-    this->m_boundRect = std::make_shared<std::vector<cv::Rect>> (filteredRect);
+    this->m_boundRect = std::make_shared<std::vector<cv::Rect>>(filteredRect);
     this->m_contours_poly = std::make_shared<std::vector<std::vector<cv::Point>>>(contours_poly);
 }
 
-cv::Mat PreProcessor::ImageProcessor::customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3)
-{
-    return bestEdges(input1, input2, input3); 
-}
+
+// cv::Mat PreProcessor::ImageProcessor::customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3)
+// {
+//     return bestEdges(input1, input2, input3); 
+// }
 
 void PreProcessor::ImageProcessor::setContouringThresholds(cv::Mat& blurredGreyscale)
 {
@@ -105,27 +108,30 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
     cv::normalize(roiHistogram, roiHistogram, 1.0);
     
     auto lookUp = cv::Mat(); 
-    auto images[1] = {inputImage};
-    auto channels[1] = {0};
-    float ranges[2] = {0.0, 255.0}; //should be 256?
-    cv::calcBackProject(images, 1, 0, channels, lookUp, ranges, 255.0);
-    //PreProcessor::ColourSpaceVisualiser::display(lookUp, "Backprojection", false); 
-    cv::threshold(lookUp, lookUp, threshold, 255, cv::THRESH_BINARY);
-    //PreProcessor::ColourSpaceVisualiser::display(lookUp, "Thresholded Backprojection", false);
+    int channels[1] = {0};
+    float histogramRrange[2] = {0.0, 255.0}; //should be 256?
+    float* ranges[1] = { histogramRrange };
+    cv::Mat images[1] = {inputImage};
+    //cv::calcBackProject(images, 1, channels[0], roiHistogram, lookUp, ranges);
+    //cv::threshold(lookUp, lookUp, threshold, 255, cv::THRESH_BINARY);
 
     return lookUp;
 }
 
-void PreProcessor::ImageProcessor::displayAllColourModels()
-{
-    if (this->visualiserInstance != nullptr)
-    {
-        visualiserInstance->displayRGBChannels();
-        visualiserInstance->displayHSVChannels();
-        visualiserInstance->displayLABChannels();
-        visualiserInstance->displayLUVChannels();
-    }
-}
+// void PreProcessor::ImageProcessor::displayAllColourModels()
+// {
+//     if (this->visualiserInstance != nullptr)
+//     {
+//         visualiserInstance->displayRGBChannels();
+//         visualiserInstance->displayHSVChannels();
+//         visualiserInstance->displayLABChannels();
+//         visualiserInstance->displayLUVChannels();
+//     }
+//     else
+//     {
+//         Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "This ImageProcessor instance' visualiseInstance is a nullptr. Was it called too early?"); 
+//     }
+// }
 
 cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
 {
@@ -135,15 +141,29 @@ cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
     return greyScale;
 }
 
+//resizes large images to the vertical size of 50 pxls
 cv::Mat PreProcessor::ImageProcessor::reseizeImage(cv::Mat& image)
 {
     auto numVerticalPixl = image.rows;
     auto desiredSizeFactorVertical = numVerticalPixl / 500;
-    auto desiredSize = numVerticalPixl / desiredSizeFactorVertical;
-    float reseizeFactor = static_cast<float>(desiredSize) / static_cast<float>(numVerticalPixl);
-    cv::Mat resized;
-    cv::resize(image, resized, cv::Size(), reseizeFactor, reseizeFactor, cv::INTER_LINEAR);
-    return resized; 
+    if (desiredSizeFactorVertical > 1)
+    {
+        auto desiredSize = numVerticalPixl / desiredSizeFactorVertical;
+        float reseizeFactor = static_cast<float>(desiredSize) / static_cast<float>(numVerticalPixl);
+        cv::Mat resized;
+        cv::resize(image, resized, cv::Size(), reseizeFactor, reseizeFactor, cv::INTER_LINEAR);
+        return resized;
+    }
+    return image;
+}
+
+cv::Mat PreProcessor::ImageProcessor::thresholdColourOnChannel(cv::Mat channel, int lowerBound, int upperBound, const char* frameName, bool showImage /*= false */)
+{
+    cv::Mat output; 
+    cv::threshold(channel,output, lowerBound, upperBound, cv::NORM_MINMAX);
+    cv::imshow(frameName, output);
+    cv::waitKey(0);
+    return output; 
 }
 
 // Dev function
@@ -184,41 +204,6 @@ cv::Mat PreProcessor::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& ima
         (*it)[2] = (*it)[2] % divideBy + (divideBy / 2);
     }
     return image;
-}
-
-cv::Mat PreProcessor::ImageProcessor::bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges)
-{
-    cv::Mat output = cv::Mat(lumEdges.rows, lumEdges.cols, CV_8UC1);
-    //this->display(axEdges,"ax bot normalised");
-    cv::normalize(lumEdges, lumEdges, 100, 255, cv::NORM_MINMAX);
-    cv::normalize(axEdges, axEdges, 130, 255, cv::NORM_MINMAX);
-    cv::normalize(byEdges, byEdges, 130, 255, cv::NORM_MINMAX);
-
-    auto rows = output.rows;
-    auto cols = output.cols;
-    //loop over all pixels in the image and reduce colour value on each cannel
-    for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
-    {
-        auto colourChannelAdress = output.ptr<uchar>(rowIndex);
-        auto lumChannelAdress = lumEdges.ptr<uchar>(rowIndex);
-        auto axChannelAdress = axEdges.ptr<uchar>(rowIndex);
-        auto byChannelAdress = byEdges.ptr<uchar>(rowIndex);
-        for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
-        {
-            //colourChannelAdress[columnIndex] = cv::max(cv::max(lumChannelAdress[columnIndex], axChannelAdress[columnIndex]), byChannelAdress[columnIndex]);
-            colourChannelAdress[columnIndex] = (lumChannelAdress[columnIndex]+axChannelAdress[columnIndex]+byChannelAdress[columnIndex])/3;
-            if (colourChannelAdress[columnIndex] < 180)
-            {
-                colourChannelAdress[columnIndex] = 0;
-            }
-            //else
-            //{
-            //    colourChannelAdress[columnIndex] = 255;
-            //}
-        }
-    }
-    //cv::normalize(output,output, 0, 255, cv::NORM_MINMAX);
-    return output;
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
@@ -312,26 +297,4 @@ int PreProcessor::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& col
          + abs(colourIn[1] - tragetColour[1])
          + abs(colourIn[2] - tragetColour[2]); 
 }
-
-//using the image which the class was initialised with, we determine the distance to pixels in the image to a target colour
-//TO DO: dynamically allocate max distance
-//TO DO: TEST
-//cv::Mat PreProcessor::ImageProcessor::createColourLocationImageBW(int maxDistance, const cv::Vec3b& targetColour)
-//{
-//    //create an 8 bit image with 1 colour channel
-//    auto output = cv::Mat(in_image.rows, in_image.cols, CV_8UC1);
-//
-//    //get colour channels
-//     cv::Mat_<cv::Vec3b>::const_iterator imageIt  = in_image.begin; 
-//     cv::Mat_<cv::Vec3b>::const_iterator intended = in_image.end; 
-//     auto resultIt = output.begin<uchar>();
-//     
-//     //for each pixel compute absolute distance, and if value is within range of colour set output pixel to white, else black
-//     for (; imageIt != intended; imageIt++, resultIt++)
-//     {
-//         (getDistanceToTargetColour(*imageIt, targetColour) <= maxDistance) ? *resultIt = 255 : *resultIt = 0; 
-//     }
-//
-//     return output; 
-//}
 

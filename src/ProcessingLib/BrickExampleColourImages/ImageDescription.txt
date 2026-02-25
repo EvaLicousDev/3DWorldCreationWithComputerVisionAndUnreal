@@ -1,0 +1,3 @@
+This folder contains images which are specifically designed to allow for histogram back projection for colour images.
+Each partial brick sample colour image is taken by the same camera module at the same distance and angle and edited to have the same 
+amount of pixels in it, to not skew with the overall results. 
