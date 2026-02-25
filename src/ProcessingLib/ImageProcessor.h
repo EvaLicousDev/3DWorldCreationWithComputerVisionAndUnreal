@@ -46,12 +46,17 @@ namespace PreProcessor
         {
             if (!in_image->empty())
             {
-                visualiserInstance = std::make_unique<ColourSpaceVisualiser>(in_image); 
+             //   visualiserInstance = std::make_unique<ColourSpaceVisualiser>(in_image); 
             }
         }
 
+        ~ImageProcessor()
+        {
+            visualiserInstance.release();
+        }
+
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
-        cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
+       // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
         cv::Mat applyCannyToBGR(cv::Mat& blurredBGR);
         cv::Mat applyCannyTo1D(cv::Mat& blurredGrey, int threshold);
         void    setContouringThresholds(cv::Mat& blurredGreyscale);
@@ -67,6 +72,8 @@ namespace PreProcessor
         cv::Mat bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy = 16);
         cv::Mat rgbColourSpaceReductionWithIt(cv::Mat& image,  int divideBy = 16);
 
+        static cv::Mat thresholdColourOnChannel(cv::Mat channel, int lowerBound, int upperBound, const char* frameName, bool showImage = false);
+
         cv::Mat sharpen2Dedges(cv::Mat& image); 
         int     getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const; 
 
@@ -74,10 +81,10 @@ namespace PreProcessor
         cv::Mat& getMainImage() { return *in_image; }
 
         void     debugInfo(cv::Mat& image);
-        void     displayAllColourModels(); 
+       // void     displayAllColourModels(); 
 
     private:
-        cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
+       // cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
 
         std::shared_ptr<cv::Mat> in_image = nullptr; 
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
@@ -93,10 +100,9 @@ namespace PreProcessor
         cv::Mat drawenContours;
         cv::Rect* m_biggestRect = nullptr; 
 
-        double controurThreshMax = 0;
-        double controurThreshMin = 0;
+        double controurThreshMax    = 0;
+        double controurThreshMin    = 0;
         double controurThreshMiddle = 0;
         //cv::Mat createColourLocationImageBW(int maxDistance, const cv::Vec3b& tragetColour);
-
     };
 }

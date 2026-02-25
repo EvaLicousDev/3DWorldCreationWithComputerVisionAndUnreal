@@ -11,7 +11,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/core.hpp>
 
-#include "../../../../../../../Program Files (x86)/Windows Kits/10/include/10.0.26100.0/ucrt/assert.h"
+#include "ERRORs/ErrorOutput.h"
 
 namespace PreProcessor
 {
@@ -35,7 +35,7 @@ namespace PreProcessor
         ColourSpaceVisualiser(imagePtr loadedImage)
             : in_image(*loadedImage)
         {
-            assert(!loadedImage->empty(), "The image passed to the ColourSpaceVisualiser is empty");
+            Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "ColourSpaceVisualiser initialised with nullptr, please investigate!");
 
             std::vector<cv::Mat> bgr_channels;
             cv::split(in_image, bgr_channels);
@@ -72,17 +72,13 @@ namespace PreProcessor
 
             cv::cvtColor(in_image, image_greyscale, cv::COLOR_BGR2GRAY);
 
-            for (auto* adress : channelAdresses)
-            {
-                assert(!adress->empty(), "The image passed to the ColourSpaceVisualiser is empty");
-            }
         }
 
         ~ColourSpaceVisualiser()
         {
             for (cv::Mat* channel : channelAdresses)
             {
-                *channel.release(); 
+                channel->release(); 
             }
         }
 
@@ -92,7 +88,7 @@ namespace PreProcessor
         void     display(cv::Mat& image, const char* frameName, int pixels);
         void     displayRGBChannels();
         void     displayHSVChannels();
-        void     displayHSVChannelsAndOriginal();
+     //   void     displayHSVChannelsAndOriginal();
         void     displayLABChannels();
         void     displayLUVChannels();
 
@@ -103,6 +99,7 @@ namespace PreProcessor
         cv::Mat  getSaturation() { return image_saturation; }
 
     private:
+
         cv::Mat in_image;
 
         //RGB/BGR channels
@@ -126,7 +123,6 @@ namespace PreProcessor
         cv::Mat image_V;
 
         cv::Mat image_greyscale;
-
-        constexpr auto channelAdresses = getAdressArray<cv::Mat>(in_image, image_R, image_G, image_B, image_hue, image_saturation, image_value, image_Lumosity, image_Axis, image_BlueYellow, image_Lumosity2, image_U, image_V, image_greyscale);
+        const std::array<cv::Mat*, 14> channelAdresses = {&in_image, &image_R, &image_G, &image_B, &image_hue, &image_saturation, &image_value, &image_Lumosity, &image_Axis, &image_BlueYellow, &image_Lumosity2, &image_U, &image_V}; 
     };
 }

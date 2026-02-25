@@ -16,7 +16,7 @@ namespace Histogram
     public: 
         SingleChannelHistogram(cv::Mat& image1D)
         {
-            auto images[1] = {image1D}; 
+            cv::Mat images[1] = {image1D}; 
             cv::calcHist(images, 1, channel, cv::Mat(), m_histogram, 1, histogramSections, range, true, false);
         }
 
