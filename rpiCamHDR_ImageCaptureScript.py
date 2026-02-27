@@ -1,4 +1,3 @@
-#Script used for capturing images every hour 
 import time
 import json
 import cv2
@@ -13,7 +12,7 @@ from datetime import datetime
 
 SECONDS_PER_HOUR = 3600
 RATIO = 3.0
-OUTPUT_DIR = Path("/home/*/capturedImages/Set2")
+OUTPUT_DIR = Path("/home/evaliciousdev/capturedImages/Set3")
 
 #First the camera is prepared
 #initialise instance
@@ -26,14 +25,24 @@ picam2.start()
 time.sleep(2)
 metadata = picam2.capture_metadata()
 exposure_normal = metadata["ExposureTime"]
+#exposure_normal = 10000
 gain_normal = metadata["AnalogueGain"] * metadata["DigitalGain"]
+#gain_normal = 1.0
 picam2.stop()
-controls = {"AfMode":2, #continuous autofocus
-            "ExposureTime": exposure_normal,
-            "AnalogueGain": gain_normal,
-            "AwbEnable": True,
-            "Saturation":1.3, #increasing saturation and contrast for better results
-            "Contrast":1.1}
+
+controls_twilight = {"AfMode":2, #continuous autofocus
+                        "AeEnable": False, #manually control exposure and gain
+                        "ExposureTime": exposure_normal,
+                        "AnalogueGain": gain_normal,
+                        "AwbEnable": False,
+                        "ColourGains":(2.0,2.0),
+                        "Contrast":1.2,
+                        "Saturation":1.2,
+                        "Brightness":-0.3
+                        }
+
+controls = controls_twilight
+
 capture_config = picam2.create_preview_configuration(main={"size": (1920,1080),
                                                            "format": "RGB888"},
                                                      controls=controls)
@@ -42,6 +51,7 @@ picam2.configure(capture_config)
 def capture_hdr_set():
     #Note if this script is run on the hour there will be issues in naming!
     timestamp = datetime.now().strftime("%d%m_%H%M%S")
+    metadata_timestamp = datetime.now().strftime("%d%m_%H")
     print(f"Capturing HDR set: {timestamp}")
     time.sleep(2)
     
@@ -52,14 +62,30 @@ def capture_hdr_set():
     picam2.stop()
     print(f"-captured normal")
 
-
     exposure_short = int(exposure_normal / RATIO)
+    exp_nom_2 = (exposure_normal+exposure_short);
+    
+    picam2.set_controls({"ExposureTime": (exposure_normal+exposure_short), "AnalogueGain": gain_normal})
+    time.sleep(0.5)
+    picam2.start()
+    normal2 = picam2.capture_array()
+    picam2.stop()
+    print(f"-captured normal 2")
+    
     picam2.set_controls({"ExposureTime": exposure_short, "AnalogueGain": gain_normal})
     time.sleep(0.5)
     picam2.start()
     short = picam2.capture_array()
     picam2.stop()
     print(f"-captured short")
+    
+    exposure_short = int(exposure_normal / RATIO)
+    picam2.set_controls({"ExposureTime": exposure_short*2, "AnalogueGain": gain_normal})
+    time.sleep(0.5)
+    picam2.start()
+    short2 = picam2.capture_array()
+    picam2.stop()
+    print(f"-captured short 2")
 
     exposure_long = int(exposure_normal * RATIO)
     picam2.set_controls({"ExposureTime": exposure_long, "AnalogueGain": gain_normal})
@@ -67,18 +93,22 @@ def capture_hdr_set():
     picam2.start()
     long = picam2.capture_array()
     picam2.stop()
+    short_exposure_2 = exposure_short*2
     print(f"-captured long")
-    print(f"        EXPOSURE SHORT: {exposure_short}")
-    print(f"        EXPOSURE NORM : {exposure_normal}")
-    print(f"        EXPOSURE LONG : {exposure_long}")
+    print(f"        EXPOSURE SHORT   : {exposure_short}")
+    print(f"        EXPOSURE SHORT 2 : {short_exposure_2}")
+    print(f"        EXPOSURE NORM    : {exposure_normal}")
+    print(f"        EXPOSURE NORM  2 : {exp_nom_2}")
+    print(f"        EXPOSURE LONG    : {exposure_long}")
     
     filename = OUTPUT_DIR / f"hdr_{timestamp}.jpg"
+    metadata_filename = OUTPUT_DIR / f"metadata_mertensHDR_{metadata_timestamp}.txt"
     imagename_hdr = filename
     imagename_normal = OUTPUT_DIR / f"normal_{timestamp}.jpg"
     print(f"-set filenames")
     
     merge = cv2.createMergeMertens()
-    merged = merge.process([short, normal, long])
+    merged = merge.process([short, short2, normal, normal2, long])
     merged = np.clip(merged * 255, 0, 255).astype(np.uint8)
     cv2.imwrite(f"{imagename_normal}", normal)
     cv2.imwrite(f"{imagename_hdr}", merged)
