@@ -12,7 +12,7 @@ from datetime import datetime
 
 SECONDS_PER_HOUR = 3600
 RATIO = 3.0
-OUTPUT_DIR = Path("/home/evaliciousdev/capturedImages/Set3")
+OUTPUT_DIR = Path("/home/*/capturedImages/Set3")
 
 #First the camera is prepared
 #initialise instance
