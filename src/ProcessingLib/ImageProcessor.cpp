@@ -103,19 +103,39 @@ cv::Mat PreProcessor::ImageProcessor::applySobel(cv::Mat& blurredBGR, int k)
 
 cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
 {
-    auto roiHistogramData = Histogram::SingleChannelHistogram(regionOfInterest); 
-    auto roiHistogram = roiHistogramData.getHistogram();
-    cv::normalize(roiHistogram, roiHistogram, 1.0);
-    
-    auto lookUp = cv::Mat(); 
-    int channels[1] = {0};
-    float histogramRrange[2] = {0.0, 255.0}; //should be 256?
-    float* ranges[1] = { histogramRrange };
-    cv::Mat images[1] = {inputImage};
-    //cv::calcBackProject(images, 1, channels[0], roiHistogram, lookUp, ranges);
-    //cv::threshold(lookUp, lookUp, threshold, 255, cv::THRESH_BINARY);
+    //convert input image and ROI to lab and split channels
+    //we seperate out the A & B channel
+    cv::Mat labImage;
+    cv::Mat labROI;
+    cv::cvtColor(inputImage, labImage, cv::COLOR_BGR2Lab);
+    cv::cvtColor(regionOfInterest, labROI, cv::COLOR_BGR2Lab);
+    cv::Mat colourMatch; //outputmask
+    colourMatch.create(labImage.size(), labImage.depth());
 
-    return lookUp;
+    cv::Mat imageAB; 
+    cv::Mat brickSampleAB;
+    imageAB.create(labImage.size(), labImage.depth());
+    brickSampleAB.create(brickSampleAB.size(), brickSampleAB.depth());
+    std::vector<float> ranges = { 0,255,0,255};
+
+
+    //Seperated out A & B channels for both input and sample
+    int channels[4] = {1,0,2,1};
+    cv::mixChannels(&labImage, 1, &imageAB, 1, channels, 2);
+    cv::mixChannels(&labImage, 1, &imageAB, 1, channels, 2);
+
+    std::vector<int> histCh = {0,1}; 
+    std::vector<int> histSize = { 256, 256};
+    cv::Mat brickHist;
+    cv::calcHist(brickSampleAB, histCh,cv::Mat(), brickHist, histSize, ranges);
+    cv::normalize(brickHist,brickHist, 1.0);
+
+    std::vector<int> numImage = {1};
+    cv::InputArrayOfArrays images = {imageAB};
+    cv::calcBackProject(images, histCh,brickHist,colourMatch,ranges,1);
+    cv::threshold(colourMatch, colourMatch, threshold, 255, cv::THRESH_BINARY);
+
+    return colourMatch;
 }
 
 // void PreProcessor::ImageProcessor::displayAllColourModels()
