@@ -18,6 +18,8 @@ namespace Histogram
             histogramPtr.reset();
         }
 
+        std::weak_ptr<SingleChannelHistogram> getHistogram(){ return histogramPtr; }
+
     private:
         std::shared_ptr<SingleChannelHistogram> histogramPtr; 
 

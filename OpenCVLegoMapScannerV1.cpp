@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "src/ProcessingLib/BrickColourClassifier.h"
+#include "src/ProcessingLib/ColourDetector.h"
 
 using namespace std;
 using namespace cv;
@@ -63,79 +64,148 @@ int main()
      */
 
     std::cout << "Starting Preprocessing" << std::endl;
-    //const char* filepath = "C:/Users/evali/Pictures/Lego_TestPlate_GoodLighting2.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Lego_TestPlate_GoodLighting2_testrow.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/WebcamLenovo_simple.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Webcam_Envy360_complex.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/WebcamLenovo_glare_skew.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Phone_Rosia_glare.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Phone_Rosia_no_glare.jpg";
+    //Example images
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
+    const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY_2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DARK.jpg";
 
-    //const char* filepath = "C:/Users/evali/Pictures/HDR.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_soft.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_vibrant.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_distance_zoom.jpg";
 
-    const char* filepath = "C:/Users/evali/Pictures/HDR_night.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_night2.jpg";
+    //Example bricks
+    const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Purple.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_LightGreen.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink2.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_DarkBlue.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Head.jpg";
 
-    //const char* filepath = "C:/Users/evali/Pictures/RED_HistogramTestImage.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/ORANGE_HistogramTestImage.jpg";
-
-    //Setup fallback solution: Histogram back projection of prepared sample images for each colour brick
 
     //Get the desired image from location 
-    cv::namedWindow("Image to process NO BLUR");
+    //cv::namedWindow("Image to process NO BLUR");
+
     cv::Mat blurred; 
     cv::Mat lab;
     cv::Mat labChannels[3];
     cv::Mat bgrChannels[3];
+    cv::Mat mserOutMask; 
 
     cv::Mat redYellowOrangeMask; 
-
     cv::Mat imageToProcess = cv::imread(filepath, cv::ImreadModes::IMREAD_COLOR_BGR); 
+
     auto processor = ImageProcessor(imageToProcess);
     imageToProcess = processor.reseizeImage(imageToProcess);
+    imshow("image", imageToProcess);
 
-    cv::imshow("Image to process NO BLUR", imageToProcess);
-    cv::waitKey(0);
+    cv::Mat roi = cv::imread(histPath, cv::ImreadModes::IMREAD_COLOR_BGR);
 
-    cv::medianBlur(imageToProcess, blurred,9);
-    cv::imshow("Image to process Median blur k = 9", blurred);
-    cv::waitKey(0);
+    cv::medianBlur(imageToProcess, blurred, 9);
+    cv::medianBlur(roi, roi, 9);
 
-    cv::split(blurred, bgrChannels);
-    for (auto channel : bgrChannels)
+    auto plate = processor.findRectWithLargestVoliumInGreenChannel(blurred, 100, true);
+    rectangle(blurred, plate, CV_RGB(255, 0, 255));
+
+    mserOutMask = processor.getMSERMask(imageToProcess); 
+    auto greenMask = processor.getGreenMask(); 
+    processor.getContourData(mserOutMask, true);
+    imshow("mser controus", processor.getDrawnContours());
+
+    auto rectanglesPtr2 = processor.getRectangles();
+    if (rectanglesPtr2 != nullptr && rectanglesPtr2->size() != 0)
     {
-        cv::imshow("BGR channel", channel);
+        for (auto rectangleInstance : *rectanglesPtr2)
+        {
+            if ((rectangleInstance.width + rectangleInstance.height) != 0)
+            {
+                rectangle(blurred, rectangleInstance, CV_RGB(50, 150, 150));
+            }
+        }
+    }
+    imshow("mser controus on blurr", blurred);
+
+    waitKey(0);
+    if (greenMask != nullptr)
+    {
+        cv::Mat addedMasks; 
+        addedMasks = processor.addGreenAndMSER(*greenMask, mserOutMask);
+        medianBlur(addedMasks, addedMasks, 9); 
+        imshow("added green and mser mask", addedMasks);
+
+        cv::Mat whiteAreas; 
+        blurred.copyTo(whiteAreas, addedMasks); 
+        cv::Mat greyMask;
+        cvtColor(whiteAreas, greyMask, COLOR_BGR2GRAY);
+
+        processor.getContourData(greyMask, true); 
+
+//        auto whiteRect = processor.findRectWithLongestSide(*processor.getContourPoints(), plate); 
+  //      rectangle(blurred, whiteRect, CV_RGB(0, 255, 255), 2);
+    //    imshow("With white box", blurred);
+      //  waitKey(0);
+
+        cv::Mat soble = processor.applySobel(addedMasks, 5); 
+        imshow("soble addedMasks k = 5", soble);
+
+        cv::Mat canny = processor.applyCannyTo1D(addedMasks, 200);
+        imshow("canny", canny);
+
+        processor.getContourData(canny, true); 
+        imshow("controus", processor.getDrawnContours());
+
+
+        cv::Rect closestToWhite;
+        double distanceToWhite = 10000;
+        cv::Scalar white(255, 255, 255);
+
+        auto rectanglesPtr = processor.getRectangles(); 
+        if (rectanglesPtr != nullptr && rectanglesPtr->size() != 0)
+        {
+            for (auto rectangleInstance : *rectanglesPtr )
+            {
+                if (rectangleInstance.width != 0 && rectangleInstance.height != 0)
+                {
+                    cv::rectangle(imageToProcess, rectangleInstance, CV_RGB(0, 255, 0), 2);
+
+                    cv::Mat rectanglePxls = whiteAreas(rectangleInstance);
+                    cv::Scalar avarageColour = cv::mean(rectanglePxls);
+                    double absDistance = cv::norm(white, avarageColour, NORM_L2);
+                    if (absDistance < distanceToWhite)
+                    {
+                        distanceToWhite = absDistance;
+                        closestToWhite = rectangleInstance;
+                    }
+                }
+            }
+        }
+
+        rectangle(imageToProcess, closestToWhite, CV_RGB(255, 0, 0), 3);
+
+        imshow("Squares", imageToProcess);
         cv::waitKey(0);
+
+        cv::rectangle(imageToProcess, closestToWhite, CV_RGB(255, 255, 0), 2);
+
+        auto roi = cv::Mat(blurred, closestToWhite);
+        processor.backprojectHistogram(whiteAreas, roi, 20);
     }
 
-    cv::threshold(blurred, redYellowOrangeMask, 200, 255, NORM_MINMAX);
-    cv::imshow("RED YELLOW ORANGE candidates", redYellowOrangeMask);
+
+    cv::imshow("Image to process Median blur k = 9", blurred);
+    cv::imshow("ROI blurred", roi);
     cv::waitKey(0);
 
-    cv::cvtColor(blurred, lab, COLOR_BGR2Lab);
-    cv::split(lab,labChannels); 
+    redYellowOrangeMask = processor.backprojectHistogram(blurred, roi, 150);
 
+    // int thresh = 20; 
+    // auto absDifRed = AbsColourDistance::ColourDetector::processChannel(blurred, roi, thresh, BrickCV::LAB_AXIS); 
+    // cv::imshow("ROI axis histogram", absDifRed);
+    // cv::waitKey(0);
 
-    for (int lower = 256; lower > 0; lower-=10)
-    {
-        std::string frameName = "Lower bound : ";
-        frameName.append(std::to_string(lower)); 
-        frameName.append(" Upper bound : ");
-        frameName.append(std::to_string((lower-10)));
-        ImageProcessor::thresholdColourOnChannel(labChannels[0], (lower-10), (lower), frameName.c_str(), true);
-    }
-
-    for (int lower = 256; lower > 11; lower -= 10)
-    {
-        std::string frameName = "Lower bound : ";
-        frameName.append(std::to_string(lower));
-        frameName.append(" Upper bound : ");
-        frameName.append(std::to_string((lower - 10)));
-        ImageProcessor::thresholdColourOnChannel(labChannels[2], (lower - 10), (lower), frameName.c_str(), true);
-    }
+    cv::imshow("backprojected histogram", redYellowOrangeMask);
+    cv::waitKey(0);
 
     cout << "----------------------------End--------------------------------" << endl;
     return 0;

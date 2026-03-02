@@ -55,6 +55,10 @@ namespace PreProcessor
             visualiserInstance.release();
         }
 
+        cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
+        cv::Rect findRectWithLargestVolium(const std::vector<cv::Rect>& boxes);
+        cv::Rect findRectWithLargestVoliumInGreenChannel(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask = false, bool showAllRect = false);
+
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
        // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
         cv::Mat applyCannyToBGR(cv::Mat& blurredBGR);
@@ -80,14 +84,23 @@ namespace PreProcessor
         //debug functions for development
         cv::Mat& getMainImage() { return *in_image; }
 
-        void     debugInfo(cv::Mat& image);
-       // void     displayAllColourModels(); 
+        void    debugInfo(cv::Mat& image);
+        cv::Mat getMSERMask(cv::Mat unblurredImage);
+        cv::Mat addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser);
+
+        cv::Mat getDrawnContours() { return drawenContours; }
+        std::shared_ptr<cv::Mat> getGreenMask(){ return greenMask;  }
+        std::shared_ptr<std::vector<cv::Rect>> getRectangles() { return m_boundRect; }
+        std::shared_ptr<std::vector<std::vector<cv::Point>>> getContourPoints() { return m_contours_poly;  }
 
     private:
        // cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
 
         std::shared_ptr<cv::Mat> in_image = nullptr; 
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
+
+        std::shared_ptr<cv::Mat> greenMask = nullptr;
+        std::shared_ptr<cv::Mat> mserMask = nullptr;
 
         std::shared_ptr<cv::Mat> image_L = nullptr;
         std::shared_ptr<cv::Mat> image_A = nullptr;
