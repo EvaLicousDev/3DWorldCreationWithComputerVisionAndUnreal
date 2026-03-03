@@ -8,7 +8,7 @@ namespace Histogram
     struct GraphCreator
     {
         //draws vertical lines corresponding to the amount of pixels with the specific value of that bin [0-255]
-        cv::Mat createHistorgramGraph(cv::Mat& histogram)
+        static cv::Mat createHistorgramGraph(cv::Mat& histogram)
         {
             double minVal;
             double maxVal;

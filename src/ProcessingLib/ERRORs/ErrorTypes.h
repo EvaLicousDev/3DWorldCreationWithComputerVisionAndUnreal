@@ -10,7 +10,8 @@ namespace Errors
         COULD_NOT_ALLOCATE = 2,
         NULL_PTR = 3,
         MEMORY_LEAK_WARNING = 4, 
-        IMAGE_PATH_EMPTY = 5
+        IMAGE_PATH_EMPTY = 5,
+        IMAGEs_NOT_EQUAL_SIZE = 6
     };
 
     static const constexpr char* getErrorMessage(const BrickCVErrors& error)
@@ -34,6 +35,9 @@ namespace Errors
             break;
         case IMAGE_PATH_EMPTY:
             return "[IMPORTANT ERROR] [An image path was evaluated to an empty string]";
+            break;
+        case IMAGEs_NOT_EQUAL_SIZE:
+            return "[IMPORTANT ERROR] [Function requires images of equal size]";
             break;
         default:
             return "sth went really wrong if you see this.";

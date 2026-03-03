@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "src/ProcessingLib/BrickColourClassifier.h"
+#include "src/ProcessingLib/ColourDetector.h"
 
 using namespace std;
 using namespace cv;
@@ -63,79 +64,161 @@ int main()
      */
 
     std::cout << "Starting Preprocessing" << std::endl;
-    //const char* filepath = "C:/Users/evali/Pictures/Lego_TestPlate_GoodLighting2.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Lego_TestPlate_GoodLighting2_testrow.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/WebcamLenovo_simple.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Webcam_Envy360_complex.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/WebcamLenovo_glare_skew.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Phone_Rosia_glare.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/Phone_Rosia_no_glare.jpg";
+    //Example images
+     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
+    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP2.jpg";
+     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
 
-    //const char* filepath = "C:/Users/evali/Pictures/HDR.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_soft.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_vibrant.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_distance_zoom.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY_2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK_Test.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DARK.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_CAM2.jpg"
 
-    const char* filepath = "C:/Users/evali/Pictures/HDR_night.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_night2.jpg";
 
-    //const char* filepath = "C:/Users/evali/Pictures/RED_HistogramTestImage.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/ORANGE_HistogramTestImage.jpg";
+    //Example bricks
+    const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";;
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Purple.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_LightGreen.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink2.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_DarkBlue.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Head.jpg";
 
-    //Setup fallback solution: Histogram back projection of prepared sample images for each colour brick
 
     //Get the desired image from location 
-    cv::namedWindow("Image to process NO BLUR");
+    //cv::namedWindow("Image to process NO BLUR");
+
+    bool demo = true; 
+
     cv::Mat blurred; 
-    cv::Mat lab;
-    cv::Mat labChannels[3];
-    cv::Mat bgrChannels[3];
-
-    cv::Mat redYellowOrangeMask; 
-
+    cv::Mat mserOutMask; 
+    // cv::Mat redYellowOrangeMask; 
     cv::Mat imageToProcess = cv::imread(filepath, cv::ImreadModes::IMREAD_COLOR_BGR); 
+
     auto processor = ImageProcessor(imageToProcess);
     imageToProcess = processor.reseizeImage(imageToProcess);
+    imshow("image", imageToProcess);
 
-    cv::imshow("Image to process NO BLUR", imageToProcess);
-    cv::waitKey(0);
+    cv::Mat roi = cv::imread(histPath, cv::ImreadModes::IMREAD_COLOR_BGR);
 
-    cv::medianBlur(imageToProcess, blurred,9);
-    cv::imshow("Image to process Median blur k = 9", blurred);
-    cv::waitKey(0);
+    cv::medianBlur(imageToProcess, blurred, 9);
+    cv::medianBlur(roi, roi, 9);
 
-    cv::split(blurred, bgrChannels);
-    for (auto channel : bgrChannels)
+    //remove the table from image
+    auto blackTray = processor.findBlackBG(blurred, true);
+    cv::Mat blurredROI = blurred(blackTray); 
+    cv::Mat unprocessedROI = imageToProcess(blackTray);
+    imshow("blurredROI", blurredROI);
+    cv::waitKey(0); 
+    
+    //find lego
+    auto plate = processor.findLegoWithThresholdingMask(blurredROI, 150, true);
+    cv::Mat blurredROIDet;
+    blurredROI.copyTo(blurredROIDet);
+    auto upper = processor.getLegoPXMask();
+
+    if (demo)
     {
-        cv::imshow("BGR channel", channel);
+        rectangle(blurredROIDet, plate, CV_RGB(255, 0, 255));
+        imshow("Detected Board", blurredROIDet);
+        waitKey(0);
+    }
+
+    auto thresholdingROI = cv::Rect(plate.tl().x, 0, plate.width, plate.tl().y);
+    cv::Mat legoROI = blurredROI(plate);
+    cv::Mat exampleBricks = unprocessedROI(thresholdingROI);
+    cv::Mat exampleBricksBlurred = blurredROI(thresholdingROI);
+
+    bool failedFirstTime = false; 
+    cv::Mat unprocessedROI2;
+    if (exampleBricks.cols == 0 || exampleBricks.rows == 0)
+    {
+        // Fallback 1 - Theory:
+        // Most cameras pick up green well even in low light conditions
+        // Therefor we use the green channel in the RGB image of the unprocessedROI
+        failedFirstTime = true; 
+
+        cv::Mat channels[3];
+        split(unprocessedROI, channels); 
+        cv::Mat greenThresh; 
+        medianBlur(channels[1], channels[1], 9); 
+        cv::threshold(channels[1], greenThresh, 50, 255, THRESH_BINARY); 
+
+        auto edges = processor.applySobel(greenThresh);
+        processor.getContourData(edges, true);
+        auto contourPoints = processor.getContourPoints();
+        auto largest = processor.findRectWithLargestVolium(*processor.getRectangles());
+
+        thresholdingROI = cv::Rect(largest.tl().x, 0, largest.width, largest.tl().y);
+        legoROI = blurredROI(largest);
+        exampleBricks = unprocessedROI(thresholdingROI);
+        exampleBricksBlurred = blurredROI(thresholdingROI);
+        unprocessedROI2 = unprocessedROI(largest);
+        upper = processor.getLegoPXMask();
+
+        if (demo)
+        {
+            rectangle(unprocessedROI, largest, CV_RGB(255, 255, 0), 2);
+            imshow("mask faulty detection - green thresh", unprocessedROI);
+            cv::waitKey(0);
+        }
+    }
+    
+    if (demo)
+    {
+        imshow("PLate mask", legoROI);
+        imshow("Thresh area", exampleBricks);
+        waitKey(0);
+    }
+
+    mserOutMask = processor.getMSERMask(exampleBricks);
+    processor.getContourData(mserOutMask, true);
+    auto rectanglesPtr2 = processor.getRectangles();
+
+    //find bricks
+    auto bricks = std::vector<cv::Rect>();
+    if (rectanglesPtr2 != nullptr && rectanglesPtr2->size() != 0)
+    {
+        for (auto rectangleInstance : *rectanglesPtr2)
+        {
+            bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width*2); 
+            if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
+            {
+                if (demo) rectangle(exampleBricksBlurred, rectangleInstance, CV_RGB(50, 150, 150), 2);
+                bricks.emplace_back(rectangleInstance);
+            }
+        }
+    }
+
+    if (demo)
+    {
+        imshow("Bricks", exampleBricksBlurred);
+        waitKey(0);
+    }
+
+    failedFirstTime ? unprocessedROI = unprocessedROI2 : unprocessedROI = unprocessedROI; 
+    mserOutMask = processor.getMSERMask(unprocessedROI); 
+    cv::medianBlur(mserOutMask, mserOutMask, 3); 
+    imshow("Feature detection", mserOutMask);
+
+    bool showProjection = true; 
+    for (auto brick : bricks)
+    {
+        auto brickMat = exampleBricksBlurred(brick); 
+        auto pixels = processor.backprojectHistogram(legoROI, brickMat, 50);
+        cv::threshold(pixels, pixels, 100, 255, THRESH_BINARY);
+
+        cv::imshow("Assumed area", pixels);
         cv::waitKey(0);
     }
 
-    cv::threshold(blurred, redYellowOrangeMask, 200, 255, NORM_MINMAX);
-    cv::imshow("RED YELLOW ORANGE candidates", redYellowOrangeMask);
     cv::waitKey(0);
-
-    cv::cvtColor(blurred, lab, COLOR_BGR2Lab);
-    cv::split(lab,labChannels); 
-
-
-    for (int lower = 256; lower > 0; lower-=10)
-    {
-        std::string frameName = "Lower bound : ";
-        frameName.append(std::to_string(lower)); 
-        frameName.append(" Upper bound : ");
-        frameName.append(std::to_string((lower-10)));
-        ImageProcessor::thresholdColourOnChannel(labChannels[0], (lower-10), (lower), frameName.c_str(), true);
-    }
-
-    for (int lower = 256; lower > 11; lower -= 10)
-    {
-        std::string frameName = "Lower bound : ";
-        frameName.append(std::to_string(lower));
-        frameName.append(" Upper bound : ");
-        frameName.append(std::to_string((lower - 10)));
-        ImageProcessor::thresholdColourOnChannel(labChannels[2], (lower - 10), (lower), frameName.c_str(), true);
-    }
 
     cout << "----------------------------End--------------------------------" << endl;
     return 0;

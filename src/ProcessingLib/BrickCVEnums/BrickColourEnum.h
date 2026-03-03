@@ -57,7 +57,7 @@ namespace BrickCV
             return "";
             break;
         case RED:
-            return "BrickExampleColourImages\RED_HistogramTestImage.jpg";
+            return "BrickExampleColourImages/RED_HistogramTestImage.jpg";
             break;
         case YELLOW:
             return "";
@@ -66,7 +66,7 @@ namespace BrickCV
             return "";
             break;
         case ORANGE:
-            return "BrickExampleColourImages\ORANGE_HistogramTestImage.jpg";
+            return "BrickExampleColourImages/ORANGE_HistogramTestImage.jpg";
             break;
         case PURPLE:
             return "";

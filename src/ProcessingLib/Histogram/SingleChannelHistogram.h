@@ -18,6 +18,7 @@ namespace Histogram
         {
             cv::Mat images[1] = {image1D}; 
             cv::calcHist(images, 1, channel, cv::Mat(), m_histogram, 1, histogramSections, range, true, false);
+            cv::normalize(m_histogram, m_histogram, 0, 255, cv::NORM_MINMAX, -1, cv::Mat());
         }
 
         ~SingleChannelHistogram()
