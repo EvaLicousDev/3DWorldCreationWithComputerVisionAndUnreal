@@ -16,7 +16,10 @@ namespace PreProcessor
     using imagePtr = std::shared_ptr<cv::Mat>;
 
     static constexpr int sc_coloursToIdentify = 8;
-
+    static const int sc_greenBlueLowerAxis = -126;
+    static const int sc_greenBlueUpperAxis = 0;
+    static const int sc_greenBlueLowerBY = -128;
+    static const int sc_greenBlueUpperBY = 128;
     class ImageProcessor
     {
         /*
@@ -57,7 +60,8 @@ namespace PreProcessor
 
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
         cv::Rect findRectWithLargestVolium(const std::vector<cv::Rect>& boxes);
-        cv::Rect findRectWithLargestVoliumInGreenChannel(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask = false, bool showAllRect = false);
+        cv::Rect findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask = false, bool showAllRect = false);
+        cv::Rect findBlackBG(cv::Mat imageToProcess, bool showBlackMask = false, bool showAllRect = false);
 
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
        // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
@@ -89,7 +93,7 @@ namespace PreProcessor
         cv::Mat addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser);
 
         cv::Mat getDrawnContours() { return drawenContours; }
-        std::shared_ptr<cv::Mat> getGreenMask(){ return greenMask;  }
+        std::shared_ptr<cv::Mat> getLegoPXMask(){ return legoPXMask;  }
         std::shared_ptr<std::vector<cv::Rect>> getRectangles() { return m_boundRect; }
         std::shared_ptr<std::vector<std::vector<cv::Point>>> getContourPoints() { return m_contours_poly;  }
 
@@ -99,7 +103,7 @@ namespace PreProcessor
         std::shared_ptr<cv::Mat> in_image = nullptr; 
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
 
-        std::shared_ptr<cv::Mat> greenMask = nullptr;
+        std::shared_ptr<cv::Mat> legoPXMask = nullptr;
         std::shared_ptr<cv::Mat> mserMask = nullptr;
 
         std::shared_ptr<cv::Mat> image_L = nullptr;

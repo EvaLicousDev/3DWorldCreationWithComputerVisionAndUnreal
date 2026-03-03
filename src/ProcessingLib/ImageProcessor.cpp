@@ -103,6 +103,7 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage)
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
     cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create();
+
     std::vector<std::vector<cv::Point> > regions;
     std::vector<cv::Rect> mser_bbox;
     mserAlgorithm->detectRegions(unblurredImage, regions, mser_bbox);
@@ -112,25 +113,11 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage)
             mserMask.at<uchar>(p.y, p.x) = 255;
         }
     }
+
     cv::threshold(mserMask, mserMask, 252, 255, cv::THRESH_BINARY); 
     this->mserMask = std::make_shared<cv::Mat>(mserMask); 
     return mserMask; 
 }
-
-//
-// cv::Rect PreProcessor::ImageProcessor::getLargestWhiteAvrageColourRect(std::vector<cv::Rect>& mserBoxes, cv::Mat blurred)
-// {
-//     //lambda expression - comparetor for width
-//     auto compareWidth = [](const cv::Rect& left, const cv::Rect& right)
-//         {
-//             return left.width > right.width;
-//         };
-//
-//     //sort in decending order (O(n log(n))
-//     std::sort(mserBoxes.begin(), mserBoxes.end(), compareWidth);
-//
-//
-// }
 
 cv::Mat PreProcessor::ImageProcessor::addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser)
 {
@@ -184,27 +171,28 @@ cv::Mat PreProcessor::ImageProcessor::addGreenAndMSER(const cv::Mat& green, cons
     return outMask; 
 }
 
-cv::Rect PreProcessor::ImageProcessor::findRectWithLargestVoliumInGreenChannel(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask /* = false */, bool showAllRect /* = false */) {
-    cv::imshow("image find Rec", imageToProcess);
+cv::Rect PreProcessor::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask /* = false */, bool showAllRect /* = false */) {
 
-    //isolate red channel and threshold
-    cv::Mat bgr[3]; 
-    cv::split(imageToProcess, bgr);
-    cv::Mat* green = &bgr[1]; 
+    cv::Mat legoPixMask;
+    cv::Mat copy; 
+    imageToProcess.copyTo(copy); 
 
-    cv::Mat greenPixMask;
-    cv::inRange(*green, lowerboundGreen, 255, greenPixMask); 
-    this->greenMask = std::make_shared<cv::Mat>(greenPixMask); 
+    cv::threshold(copy, legoPixMask, 50, 255, cv::THRESH_BINARY);
+    cv::cvtColor(legoPixMask, legoPixMask, cv::COLOR_BGR2GRAY);
+    cv::threshold(legoPixMask, legoPixMask, 50, 255, cv::THRESH_BINARY);
+    cv::medianBlur(legoPixMask, legoPixMask, 9); 
 
+    this->legoPXMask = std::make_shared<cv::Mat>(legoPixMask); 
+    
     if (showGreenMask)
     {
-        cv::imshow("Green pix mask", greenPixMask);
+        cv::imshow("Green pix mask", legoPixMask);
         cv::waitKey(0);
     }
 
     //find contours in thresholded
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(greenPixMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(legoPixMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
     std::vector<std::vector<cv::Point>> rectangleCont(contours.size());
     std::vector<cv::Rect> boundRect(contours.size());
 
@@ -220,6 +208,44 @@ cv::Rect PreProcessor::ImageProcessor::findRectWithLargestVoliumInGreenChannel(c
 
     //get largest by volium
     auto greatestInRed = this->findRectWithLargestVolium(boundRect); 
+
+    copy.release(); 
+
+    return greatestInRed;
+}
+
+cv::Rect PreProcessor::ImageProcessor::findBlackBG(cv::Mat imageToProcess, bool showBlackMask /* = false */, bool showAllRect /* = false */) {
+    //isolate red channel and threshold
+    cv::Mat greyScale;
+    cv::cvtColor(imageToProcess, greyScale, cv::COLOR_BGR2GRAY);
+
+    cv::Mat blackTrayMask;
+    cv::inRange(greyScale, 0, 50, blackTrayMask);
+
+    if (showBlackMask)
+    {
+        cv::imshow("Black Tray", blackTrayMask);
+        cv::waitKey(0);
+    }
+
+    //find contours in thresholded
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(blackTrayMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+    std::vector<std::vector<cv::Point>> rectangleCont(contours.size());
+    std::vector<cv::Rect> boundRect(contours.size());
+
+    for (size_t i = 0; i < contours.size(); i++)
+    {
+        approxPolyDP(contours[i], rectangleCont[i], 4, true);
+        boundRect[i] = cv::boundingRect(rectangleCont[i]);
+        if (showAllRect)
+        {
+            cv::rectangle(imageToProcess, boundRect[i], CV_RGB(255, 0, 0), 2);
+        }
+    }
+
+    //get largest by volium
+    auto greatestInRed = this->findRectWithLargestVolium(boundRect);
     return greatestInRed;
 }
 
@@ -284,7 +310,7 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
     cv::split(labROI, labROIch);
     cv::Mat* axisCh = &labImageCh[1];
 
-    cv::imshow("image axis", *axisCh);
+   // cv::imshow("image axis", *axisCh);
     cv::waitKey(0);
 
     auto axisHist = Histogram::ColourHistogram(BrickCV::BrickColour::RED, BrickCV::ChannelType::LAB_AXIS, labROIch[1]); 
@@ -296,8 +322,8 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
         cv::Mat redHistObj = redAxisHist->getHistogram();
 
         auto graphRed = Histogram::GraphCreator::createHistorgramGraph(redHistObj);
-        cv::imshow("ROI axis histogram", graphRed);
-        cv::waitKey(0);
+        //cv::imshow("ROI axis histogram", graphRed);
+        //cv::waitKey(0);
 
         float hrange[] = { 0.0, 256.0 };
         const float* range[] = { hrange };
@@ -321,8 +347,8 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
             cv::Mat result; 
             cv::add(colourMatch, colourMatch2, result, cv::Mat(), -1);
 
-            cv::imshow("Axis mask", colourMatch); 
-            cv::imshow("BY", colourMatch2); 
+           // cv::imshow("Axis mask", colourMatch); 
+            //cv::imshow("BY", colourMatch2); 
             cv::medianBlur(result, result, 9);
             return result; 
         }
@@ -340,21 +366,6 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
 
     return cv::Mat(); 
 }
-
-// void PreProcessor::ImageProcessor::displayAllColourModels()
-// {
-//     if (this->visualiserInstance != nullptr)
-//     {
-//         visualiserInstance->displayRGBChannels();
-//         visualiserInstance->displayHSVChannels();
-//         visualiserInstance->displayLABChannels();
-//         visualiserInstance->displayLUVChannels();
-//     }
-//     else
-//     {
-//         Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "This ImageProcessor instance' visualiseInstance is a nullptr. Was it called too early?"); 
-//     }
-// }
 
 cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
 {
