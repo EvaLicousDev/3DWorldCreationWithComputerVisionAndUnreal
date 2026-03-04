@@ -11,7 +11,9 @@ namespace Errors
         NULL_PTR = 3,
         MEMORY_LEAK_WARNING = 4, 
         IMAGE_PATH_EMPTY = 5,
-        IMAGEs_NOT_EQUAL_SIZE = 6
+        IMAGEs_NOT_EQUAL_SIZE = 6, 
+        X_COORDINATE_MISMATCH = 7,
+        FUNCTION_CALLED_TOO_SOON = 8
     };
 
     static const constexpr char* getErrorMessage(const BrickCVErrors& error)
@@ -38,6 +40,12 @@ namespace Errors
             break;
         case IMAGEs_NOT_EQUAL_SIZE:
             return "[IMPORTANT ERROR] [Function requires images of equal size]";
+            break;
+        case X_COORDINATE_MISMATCH:
+            return "[CRITICAL ERROR] [Expected x coordinated diviated too strongly from provided]";
+            break;
+        case FUNCTION_CALLED_TOO_SOON:
+            return "[CRITICAL ERROR] [This function failed a basic check it needs to pass in order to return a valid result, likely due to being called too soon. Please breakpoint and check.]";
             break;
         default:
             return "sth went really wrong if you see this.";

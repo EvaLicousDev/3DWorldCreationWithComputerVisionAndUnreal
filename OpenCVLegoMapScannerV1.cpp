@@ -65,10 +65,11 @@ int main()
 
     std::cout << "Starting Preprocessing" << std::endl;
     //Example images
-     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
-    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP2.jpg";
-     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
+    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
 
     //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
@@ -82,7 +83,7 @@ int main()
 
 
     //Example bricks
-    const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";;
+    const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";
     //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Purple.jpg";
     //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_LightGreen.jpg";
     //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink.jpg";
@@ -94,130 +95,136 @@ int main()
     //Get the desired image from location 
     //cv::namedWindow("Image to process NO BLUR");
 
+    //---------------------------------------------------------
     bool demo = true; 
+    //---------------------------------------------------------
 
     cv::Mat blurred; 
     cv::Mat mserOutMask; 
-    // cv::Mat redYellowOrangeMask; 
     cv::Mat imageToProcess = cv::imread(filepath, cv::ImreadModes::IMREAD_COLOR_BGR); 
 
+    //load image and resize
     auto processor = ImageProcessor(imageToProcess);
     imageToProcess = processor.reseizeImage(imageToProcess);
-    imshow("image", imageToProcess);
-
-    cv::Mat roi = cv::imread(histPath, cv::ImreadModes::IMREAD_COLOR_BGR);
-
     cv::medianBlur(imageToProcess, blurred, 9);
-    cv::medianBlur(roi, roi, 9);
 
-    //remove the table from image
-    auto blackTray = processor.findBlackBG(blurred, true);
-    cv::Mat blurredROI = blurred(blackTray); 
-    cv::Mat unprocessedROI = imageToProcess(blackTray);
-    imshow("blurredROI", blurredROI);
-    cv::waitKey(0); 
-    
-    //find lego
-    auto plate = processor.findLegoWithThresholdingMask(blurredROI, 150, true);
-    cv::Mat blurredROIDet;
-    blurredROI.copyTo(blurredROIDet);
-    auto upper = processor.getLegoPXMask();
+    if (demo) imshow("loaded image", imageToProcess);
+    if (demo) imshow("blurred version - median blur k = 9", blurred);
+    if (demo) waitKey(0);
 
-    if (demo)
+    // remove the table from image and find plate
+    // this can fail and we have 1 fallback if it does 
+    auto presumedROI = processor.findLargestSquareInsideBlackTray(blurred, true);
+
+    if (presumedROI != nullptr)
     {
-        rectangle(blurredROIDet, plate, CV_RGB(255, 0, 255));
-        imshow("Detected Board", blurredROIDet);
-        waitKey(0);
-    }
+        cv::Mat blurredROIDet;
+        blurred.copyTo(blurredROIDet);
+        cv::Mat unblurred;
+        imageToProcess.copyTo(unblurred);
 
-    auto thresholdingROI = cv::Rect(plate.tl().x, 0, plate.width, plate.tl().y);
-    cv::Mat legoROI = blurredROI(plate);
-    cv::Mat exampleBricks = unprocessedROI(thresholdingROI);
-    cv::Mat exampleBricksBlurred = blurredROI(thresholdingROI);
+        cv::Rect plate = *presumedROI;
+        cv::Mat legoROI = blurred(plate);
+        cv::Mat unprocessedROI = imageToProcess(plate);
 
-    bool failedFirstTime = false; 
-    cv::Mat unprocessedROI2;
-    if (exampleBricks.cols == 0 || exampleBricks.rows == 0)
-    {
-        // Fallback 1 - Theory:
-        // Most cameras pick up green well even in low light conditions
-        // Therefor we use the green channel in the RGB image of the unprocessedROI
-        failedFirstTime = true; 
-
-        cv::Mat channels[3];
-        split(unprocessedROI, channels); 
-        cv::Mat greenThresh; 
-        medianBlur(channels[1], channels[1], 9); 
-        cv::threshold(channels[1], greenThresh, 50, 255, THRESH_BINARY); 
-
-        auto edges = processor.applySobel(greenThresh);
-        processor.getContourData(edges, true);
-        auto contourPoints = processor.getContourPoints();
-        auto largest = processor.findRectWithLargestVolium(*processor.getRectangles());
-
-        thresholdingROI = cv::Rect(largest.tl().x, 0, largest.width, largest.tl().y);
-        legoROI = blurredROI(largest);
-        exampleBricks = unprocessedROI(thresholdingROI);
-        exampleBricksBlurred = blurredROI(thresholdingROI);
-        unprocessedROI2 = unprocessedROI(largest);
-        upper = processor.getLegoPXMask();
+        auto thresholdingROI = cv::Rect(plate.tl().x, 0, plate.width, plate.tl().y);
+        cv::Mat exampleBricks = unblurred(thresholdingROI);
+        cv::Mat exampleBricksBlurred = blurred(thresholdingROI);
 
         if (demo)
         {
-            rectangle(unprocessedROI, largest, CV_RGB(255, 255, 0), 2);
-            imshow("mask faulty detection - green thresh", unprocessedROI);
-            cv::waitKey(0);
+            imshow("PLate mask", legoROI);
+            imshow("Thresh area", exampleBricks);
+            waitKey(0);
         }
-    }
-    
-    if (demo)
-    {
-        imshow("PLate mask", legoROI);
-        imshow("Thresh area", exampleBricks);
-        waitKey(0);
-    }
 
-    mserOutMask = processor.getMSERMask(exampleBricks);
-    processor.getContourData(mserOutMask, true);
-    auto rectanglesPtr2 = processor.getRectangles();
+        mserOutMask = processor.getMSERMask(exampleBricks);
+        processor.getContourData(mserOutMask, true);
+        auto rectanglesPtr2 = processor.getRectangles();
 
-    //find bricks
-    auto bricks = std::vector<cv::Rect>();
-    if (rectanglesPtr2 != nullptr && rectanglesPtr2->size() != 0)
-    {
-        for (auto rectangleInstance : *rectanglesPtr2)
+        //find bricks
+        auto bricks = std::vector<cv::Rect>();
+        if (rectanglesPtr2 != nullptr && rectanglesPtr2->size() != 0)
         {
-            bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width*2); 
-            if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
+            for (auto rectangleInstance : *rectanglesPtr2)
             {
-                if (demo) rectangle(exampleBricksBlurred, rectangleInstance, CV_RGB(50, 150, 150), 2);
-                bricks.emplace_back(rectangleInstance);
+                bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width * 2);
+                if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
+                {
+                    if (demo) rectangle(exampleBricksBlurred, rectangleInstance, CV_RGB(50, 150, 150), 2);
+                    bricks.emplace_back(rectangleInstance);
+                }
             }
         }
+
+        if (demo)
+        {
+            imshow("Bricks", exampleBricksBlurred);
+            waitKey(0);
+        }
+
+        mserOutMask = processor.getMSERMask(unprocessedROI);
+        cv::medianBlur(mserOutMask, mserOutMask, 3);
+        processor.getContourData(mserOutMask, true);
+
+        if (demo)
+        {
+            imshow("MSER contours", processor.getDrawnContours());
+            imshow("Feature detection", mserOutMask);
+            cv::waitKey(0);
+        }
+
+        bool showProjection = true;
+        for (auto brick : bricks)
+        {
+            auto brickMat = exampleBricks(brick);
+            auto pixels = processor.backprojectHistogram(unprocessedROI, brickMat, 180);
+            cv::threshold(pixels, pixels, 200, 255, THRESH_BINARY);
+            cv::Mat showPixls;
+            unprocessedROI.copyTo(showPixls, pixels);
+
+            if (showProjection)
+            {
+                cv::imshow("Brick", brickMat);
+                cv::imshow("Assumed area", showPixls);
+                cv::waitKey(2);
+            }
+
+            cv::Mat res;
+            cv::matchTemplate(unprocessedROI, brickMat, res, TemplateMatchModes::TM_SQDIFF_NORMED);
+            //cv::threshold(res, res, 0, 100, THRESH_MASK);
+            imshow("matched", res);
+            cv::waitKey(2);
+        }
     }
 
-    if (demo)
-    {
-        imshow("Bricks", exampleBricksBlurred);
-        waitKey(0);
-    }
-
-    failedFirstTime ? unprocessedROI = unprocessedROI2 : unprocessedROI = unprocessedROI; 
-    mserOutMask = processor.getMSERMask(unprocessedROI); 
-    cv::medianBlur(mserOutMask, mserOutMask, 3); 
-    imshow("Feature detection", mserOutMask);
-
-    bool showProjection = true; 
-    for (auto brick : bricks)
-    {
-        auto brickMat = exampleBricksBlurred(brick); 
-        auto pixels = processor.backprojectHistogram(legoROI, brickMat, 50);
-        cv::threshold(pixels, pixels, 100, 255, THRESH_BINARY);
-
-        cv::imshow("Assumed area", pixels);
-        cv::waitKey(0);
-    }
-
+    // for (auto brick : bricks)
+    // {
+    //     auto brickMat = exampleBricksBlurred(brick);
+    //     //get square in middle of brick
+    //     auto newX = brick.width / 4; 
+    //     auto newY = (brick.height / 8)*3;
+    //     auto sample = cv::Rect(newX, newY, (brick.width / 2), (brick.height / 4));
+    //     cv::Mat smallSample = brickMat(sample); 
+    //
+    //     cv::Mat showPixles; 
+    //     cv::Mat colourHistorgram;
+    //     cv::Mat projection;
+    //
+    //     const float hranges[2] = {0.0, 255.0};
+    //     const float* ranges[3] = {hranges, hranges, hranges};
+    //     int chan[3] = {0,1,2};
+    //     int histSz = 255; 
+    //     cv::calcHist(&smallSample, 1, chan, cv::Mat(), colourHistorgram, 2, &histSz, ranges); 
+    //     cv::normalize(colourHistorgram, colourHistorgram, 0, 255, NORM_MINMAX);
+    //     cv::calcBackProject(&legoROI, 1, chan, colourHistorgram, projection, ranges); 
+    //     cv::threshold(projection, projection, 100, 255, THRESH_BINARY);
+    //
+    //     legoROI.copyTo(showPixles, projection);
+    //     imshow("Colour Hist projection", showPixles); 
+    //     imshow("Sample", smallSample);
+    //     cv::waitKey(0);
+    // }
     cv::waitKey(0);
 
     cout << "----------------------------End--------------------------------" << endl;
