@@ -11,6 +11,12 @@
 //project includes
 #include "ColourSpaceVisualiser.h"
 
+#define NEXT_SIBLING 0
+#define PREV_SIBLING 1
+#define CHILD_CONTOUR 2
+#define PARENT_CONTOUR 3
+#define STUDS_PER_PLATE 32
+
 namespace PreProcessor
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
@@ -58,10 +64,16 @@ namespace PreProcessor
             visualiserInstance.release();
         }
 
+        std::shared_ptr<cv::Rect> findLargestSquareInsideBlackTray(cv::Mat imageToProcess, bool showBlackMask = false, bool showAllRect = false);
+
+        cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
         cv::Rect findRectWithLargestVolium(const std::vector<cv::Rect>& boxes);
         cv::Rect findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask = false, bool showAllRect = false);
-        cv::Rect findBlackBG(cv::Mat imageToProcess, bool showBlackMask = false, bool showAllRect = false);
+        cv::Rect findSquareIsh(const std::vector<cv::Point>& box);
+        cv::Rect findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
+        cv::Rect getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult); 
+        void setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
 
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
        // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
@@ -81,6 +93,7 @@ namespace PreProcessor
         cv::Mat rgbColourSpaceReductionWithIt(cv::Mat& image,  int divideBy = 16);
 
         static cv::Mat thresholdColourOnChannel(cv::Mat channel, int lowerBound, int upperBound, const char* frameName, bool showImage = false);
+        cv::Mat        backprojectHistogramHSV(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold); 
 
         cv::Mat sharpen2Dedges(cv::Mat& image); 
         int     getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const; 
@@ -92,13 +105,17 @@ namespace PreProcessor
         cv::Mat getMSERMask(cv::Mat unblurredImage);
         cv::Mat addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser);
 
-        cv::Mat getDrawnContours() { return drawenContours; }
-        std::shared_ptr<cv::Mat> getLegoPXMask(){ return legoPXMask;  }
-        std::shared_ptr<std::vector<cv::Rect>> getRectangles() { return m_boundRect; }
-        std::shared_ptr<std::vector<std::vector<cv::Point>>> getContourPoints() { return m_contours_poly;  }
+        cv::Mat                                               getDrawnContours() { return drawenContours; }
+        std::shared_ptr<cv::Mat>                              getLegoPXMask()    { return legoPXMask;  }
+        std::shared_ptr<std::vector<cv::Rect>>                getRectangles()    { return m_boundRect; }
+        std::shared_ptr<std::vector<std::vector<cv::Point>>>  getContourPoints() { return m_contours_poly;  }
 
     private:
+        bool isWithinTollerance(cv::Rect& output); 
+
        // cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
+        int leftWhiteMarkerTL_X = -1; 
+        int rightWhiteMarkerTR_X = -1; 
 
         std::shared_ptr<cv::Mat> in_image = nullptr; 
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
