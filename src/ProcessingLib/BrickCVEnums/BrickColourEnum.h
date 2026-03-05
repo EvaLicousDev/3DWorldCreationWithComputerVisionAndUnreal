@@ -4,14 +4,18 @@ namespace BrickCV
 {
     enum BrickColour : int8_t
     {
-        NOT_SET = 0,
-        RED = 1,
-        YELLOW = 2,
-        ORANGE = 4,
-        PURPLE = 5,
-        DARK_BLUE = 6,
-        PINK = 7,
-        WHITE = 8
+        PURPLE = 0,
+        DARK_BLUE = 1,
+        LIGHT_BLUE = 2,
+        BROWN = 3,
+        PINK = 4,
+        LIGHT_GREEN = 5,
+        DARK_GREEN = 6,
+        RED = 7,
+        ORANGE = 8,
+        YELLOW = 9,
+        WHITE = 10,
+        BLACK = 11
     };
 
 
@@ -19,8 +23,8 @@ namespace BrickCV
     {
         switch (brickColour)
         {
-        case NOT_SET:
-            return "NOT DECLARED";
+        case DARK_GREEN:
+            return "Dark Green";
             break;
         case RED:
             return "Red";
@@ -43,42 +47,22 @@ namespace BrickCV
         case WHITE:
             return "White";
             break;
+        case LIGHT_BLUE:
+            return "Light Blue";
+            break;
+        case LIGHT_GREEN:
+            return "Light Green";
+            break;
+        case BROWN:
+            return "Brown";
+            break;
+        case BLACK:
+            return "Black";
+            break;
         default:
             return "sth went really wrong with determaning the brick colour if you see this.";
         }
     }
 
-    static const constexpr BrickColour sc_coloursInUse[] = { RED, ORANGE };
-    static const constexpr char* getHistogramImageAdress(const BrickColour& brickColour)
-    {
-        switch (brickColour)
-        {
-        case NOT_SET:
-            return "";
-            break;
-        case RED:
-            return "BrickExampleColourImages/RED_HistogramTestImage.jpg";
-            break;
-        case YELLOW:
-            return "";
-            break;
-        case DARK_BLUE:
-            return "";
-            break;
-        case ORANGE:
-            return "BrickExampleColourImages/ORANGE_HistogramTestImage.jpg";
-            break;
-        case PURPLE:
-            return "";
-            break;
-        case PINK:
-            return "";
-            break;
-        case WHITE:
-            return "";
-            break;
-        default:
-            return "";
-        }
-    }
+    static const constexpr BrickColour sc_coloursInUse[] = { PURPLE, DARK_BLUE, LIGHT_BLUE, LIGHT_GREEN, BROWN, RED, ORANGE, YELLOW, DARK_GREEN };
 }

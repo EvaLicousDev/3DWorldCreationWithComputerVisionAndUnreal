@@ -7,6 +7,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d.hpp>
+//#include <opencv2/viz/types.hpp>
 
 //Custom Includes
 #include "src/ProcessingLib/ImageProcessor.h"
