@@ -65,11 +65,11 @@ int main()
 
     std::cout << "Starting Preprocessing" << std::endl;
     //Example images
-    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP2.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
+    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
 
     //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
@@ -185,6 +185,15 @@ int main()
 
             if (showProjection)
             {
+                auto detector = AbsColourDistance::ColourDetector(); 
+                auto brickColour = detector.getBrickApproximation(brickMat); 
+
+                auto name = std::string(getBrickColour(brickColour));
+                int margin = 5;
+                int base = 0; 
+                cv::Size textSize = cv::getTextSize(name, cv::FONT_HERSHEY_COMPLEX, 2, 2, &base); 
+                auto text = cv::Point(showPixls.cols-textSize.width-margin, textSize.height + margin);  
+                cv::putText(showPixls, name, text, cv::FONT_HERSHEY_COMPLEX, 2, CV_RGB(255, 50, 100), 2);
                 cv::imshow("Brick", brickMat);
                 cv::imshow("Assumed area", showPixls);
                 cv::waitKey(2);

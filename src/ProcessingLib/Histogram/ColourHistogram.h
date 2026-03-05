@@ -24,6 +24,6 @@ namespace Histogram
         std::shared_ptr<SingleChannelHistogram> histogramPtr; 
 
         BrickCV::ChannelType channel     = BrickCV::ChannelType::NOT_DECLARED;
-        BrickCV::BrickColour brickColour = BrickCV::BrickColour::NOT_SET; 
+        BrickCV::BrickColour brickColour = BrickCV::BrickColour::BLACK; 
     };
 }

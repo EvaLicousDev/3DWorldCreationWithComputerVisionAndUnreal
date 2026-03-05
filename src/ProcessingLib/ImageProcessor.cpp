@@ -131,7 +131,7 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage)
 {
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
-    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create();
+    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 20, ((unblurredImage.cols*unblurredImage.rows)/2),0.25 );
 
     std::vector<std::vector<cv::Point> > regions;
     std::vector<cv::Rect> mser_bbox;
