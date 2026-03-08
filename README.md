@@ -20,7 +20,7 @@ Unreal Engine 5 was chosen as medium for this project do to it's powerful graphi
 capibilities and incredible PCG (procedural content generation) plugins, allowing 
 each generated world to be unique. 
 
-The concepts used in this procet are transferable to other similar projects. 
+Many concepts used in this project are transferable to other similar projects. 
 Real-world scenarios include prototyping for games or visualising worlds for 
 story telling purposes. 
 
