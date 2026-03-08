@@ -45,10 +45,14 @@ Unreal Engine 5 natively supports cross-platform compilation.
 ----------------------------------------------------------------------------------------
 
 PYTHON 3          : FLASK, OPEN CV 2, PICAMERA 2
+
 C++ 20 or 23      : CMAKE, OPEN CV 4, GCC
+
 XML               : YAML 
+
 UNREAL ENGINE 5.7 : PCG, 
 
+----------------------------------------------------------------------------------------
 Visual Studio Code is recomended as code editor with ReSharper (perfect for Unreal 
 Engine 5 C++) as plug-in. Intellisense does not comprehend Unreal Engine 5 
 specific project structure and use of C++ macros well. 
