@@ -97,7 +97,9 @@ WinSCP allows for simple file transfer between Windows PCs and the Linux based
 PiOS, and can be setup easily, if you are running and able to access your PiOS 
 (headless or otherwise).
 
+------------------------------------------------------------------------------------------------
 *IMPORTANT: NETWORKING SECURITY*
+
 To set up the RPI as server, it's recommended to take a few steps first:
 - Change the standard SSH port on your Pi form 20 to something else between 10000 - 60000
   This is so automated attacks don't have easy access to your Rasberry Pi
