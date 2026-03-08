@@ -7,7 +7,7 @@ import zipfile
 # HRD_IMAGES_TCP (server request)
 # NGROK_ADRESS (weblink to rasberry pi)
 # USER, AUTH
-# IMAGE_FODLER
+# IMAGE_FOLDER
 # TIMEOUT (enough time in seconds for camera to run image capture script & send response)
 #---------------TOKENS END-----------------
 
