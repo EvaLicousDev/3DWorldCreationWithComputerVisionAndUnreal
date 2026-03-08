@@ -135,5 +135,5 @@ Please take anything you read here or anywhere else about cyber security with a 
 Do your own research refering to trusted sources and question anything that appears odd! 
 Never use any code you do not understand. 
 
-If you are using my code and you made it this far, great! Thank you for tking the time and I hope 
+If you are using my code and you made it this far, great! Thank you for taking the time and I hope 
 you found what you were looking for. 
