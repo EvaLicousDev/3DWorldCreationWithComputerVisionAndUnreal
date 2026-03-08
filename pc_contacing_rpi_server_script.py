@@ -25,7 +25,7 @@ import zipfile
 # local text file for debugging 
 server_log = open("image_request_log.txt", "a")
 server_log.write("------------------------START SCRIPT-----------------------------")
-server_log.write("About to contact Rasberry pi to get images")
+server_log.write("About to contact Rasberry pi to get images", "a")
 
 try:
 
