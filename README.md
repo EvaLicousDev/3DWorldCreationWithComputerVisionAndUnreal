@@ -1,6 +1,7 @@
 ----------------------------------------------------------------------------------------
 COMPUTER VISION TABLETOP RPG MAP CREATOR TOOL SETUP GUIDE
 ----------------------------------------------------------------------------------------
+Last updated 08.03.26
 
 Thank you for reading the set-up guide! This document covers system purpose, achitecture
 and technologies, and should enable any reader to navigate the repository & possibly 
