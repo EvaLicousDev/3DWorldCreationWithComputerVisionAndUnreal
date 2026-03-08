@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------------
--------------------COMPUTER VISION DND MAP CREATOR TOOL SETUP GUIDE---------------------
+-------------------COMPUTER VISION DND MAP CREATOR TOOL SETUP GUIDE-----------------
 ----------------------------------------------------------------------------------------
 
 Thank you for reading the set-up guide! This document covers system purpose, achitecture
