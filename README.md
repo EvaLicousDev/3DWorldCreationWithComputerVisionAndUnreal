@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------------
-COMPUTER VISION DND MAP CREATOR TOOL SETUP GUIDE
+-----------------COMPUTER VISION DND MAP CREATOR TOOL SETUP GUIDE-------------------
 ----------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ files and downloading and installing the corresponding compiler versions.
 Unreal Engine 5 natively supports cross-platform compilation. 
 
 ----------------------------------------------------------------------------------------
-ARCHITECTURE
+-----------------------------------ARCHITECTURE-------------------------------------
 ----------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------
 
@@ -62,7 +62,7 @@ Unreal Engine editor 5.7 was originally used to create this project. Unreal Engi
 available in earlier versions.
 
 ----------------------------------------------------------------------------------------
-                    Prerequisits - Camera system - Rasberry Pi 5
+          Prerequisits - Camera system - Rasberry Pi 5 with camer module 3
 ----------------------------------------------------------------------------------------
 Setting up the Rasberry Pi with all updates is recommended for security purposes! 
 Updating the system and all subsequent package downloads can take up to 2 days. 
