@@ -35,7 +35,7 @@ files and downloading and installing the corresponding compiler versions.
 
 Unreal Engine 5 natively supports cross-platform compilation. 
 
-'''
+```
                -,,,__
                 /    ``~~--,,__                /   /
                 /              ``~~--,     //--//
@@ -49,7 +49,7 @@ Unreal Engine 5 natively supports cross-platform compilation.
                 /  /,              `\   \\
               ,'---\ \              ,---`,;,
                     ,,,
-'''
+```
 
 ----------------------------------------------------------------------------------------
 ARCHITECTURE
