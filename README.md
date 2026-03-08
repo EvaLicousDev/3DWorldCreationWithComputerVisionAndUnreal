@@ -73,7 +73,7 @@ Setting up the Rasberry Pi with all updates is recommended for security purposes
 Updating the system and all subsequent package downloads can take up to 2 days. 
 
 
-If rebuiding this project the following setup is recommended for the rasberry pi:
+If rebuilding this project the following setup is recommended for the rasberry pi:
 - fully updated Pi OS (set up headless operation through imanging tool with PC on same network, enable "Rasberry Pi connect")
 - install python 3 (or latest)
 - install pip install as package manager
