@@ -22,7 +22,7 @@ capibilities and incredible PCG (procedural content generation) plugins, allowin
 each generated world to be unique. 
 
 The concepts used in this procet are transferable to other similar projects. 
-Real-world cenarios include prototyping for games or visualising worlds for 
+Real-world scenarios include prototyping for games or visualising worlds for 
 story telling purposes. 
 
 Heads up: While the code has been optimised for performance, this is not a light weight
