@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------------
 COMPUTER VISION TABLETOP RPG MAP CREATOR TOOL SETUP GUIDE
 ----------------------------------------------------------------------------------------
-Last updated 08.03.26
+Last updated 10.03.26 (Spellchecked)
 
 Thank you for reading the set-up guide! This document covers system purpose, achitecture
 and technologies, and should enable any reader to navigate the repository & possibly 
@@ -70,11 +70,11 @@ UNREAL ENGINE 5.7 : PCG,
 File transfer     : WinSCP
 
 ----------------------------------------------------------------------------------------
-Visual Studio Code is recomended as code editor with ReSharper (perfect for Unreal 
+Visual Studio Code is reccomended as code editor with ReSharper (perfect for Unreal 
 Engine 5 C++) as plug-in. Intellisense does not comprehend Unreal Engine 5 
 specific project structure and use of C++ macros well. 
 
-Thonny as interface for the python scripts on the Rasberry Pi 5 is sufficent and 
+Thonny editor as interface for the python scripts on the Rasberry Pi 5 is sufficent and 
 should come pre-installed through the operating system imaging tool.
 
 Unreal Engine editor 5.7 was originally used to create this project. Unreal Engine 
@@ -104,7 +104,7 @@ If rebuilding this project the following setup is recommended for the rasberry p
 ----------------------------------------------------------------------------------------
             Getting the images from the Rasberry Pi 5
 ----------------------------------------------------------------------------------------
-There are several ways to get the iamges from the Rasberry Pi 5, including connecting 
+There are several ways to get the images from the Rasberry Pi 5, including connecting 
 via an ethernet cable. We do not have to set up a server for the RPI, this was just 
 the chosen method based on the system usecases outlined in the dissertation. 
 
@@ -132,8 +132,9 @@ storing any session data on the rasberry pi 5.
 Make sure you have enough free memory on your rasberry pi 5 to take the HDR images and 
 compress them while running the server scripts. 
 
-Using TCP transfer on the Rasberry pi 5 may mean you need to allow TCP file transfer via
-the command line first. TCP file transfer is stabl, fast and reliable. The scripts in 
+Using TCP transfer on the Rasberry pi 5 may mean you need to allow TCP file transfer 
+for your chosen port via the command line first. 
+TCP file transfer is stabl, fast and reliable. The scripts in 
 this repository send compressed image data. Because of this set up your Rasberry Pi 5 
 should not have to deal with any additional junk data floating around. 
 
@@ -142,7 +143,7 @@ MAKE SURE TO CHECK MEMORY USAGE WHEN RUNNING THE SCRIPTS ON YOUR DEVICE THE FIRS
 Better safe than having to re-setup the whole thing!
 
 Should you have trouble setting up the server, you can also flush the port through the 
-command line but BE CAREFUL NOT TO ACCIDENTALLY FLUSH A PORT YOU ARE USEING FOR ANYTHIG ELSE.
+command line but BE CAREFUL NOT TO ACCIDENTALLY FLUSH A PORT YOU ARE USING FOR ANYTHIG ELSE.
 
 ------------------------------------------------------------------------------------------------
 **Important discalaimer:**
