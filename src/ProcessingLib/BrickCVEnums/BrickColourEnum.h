@@ -18,6 +18,20 @@ namespace BrickCV
         BLACK = 11
     };
 
+    // strictly has to be in order of enum above!
+    // all colours except black as black ~should~ be easy to identify through thresholding so we don't need to train a ML model
+    static const constexpr char* sc_trainingImageFolderPaths[11] = { "../TrainingImagesFolder/Purple/*.jpg",
+                                                                  "../TrainingImagesFolder/DarkBlue/*.jpg",
+                                                                  "../TrainingImagesFolder/LightBlue/*.jpg",
+                                                                  "../TrainingImagesFolder/Brown/*.jpg",
+                                                                  "../TrainingImagesFolder/Pink/*.jpg",
+                                                                  "../TrainingImagesFolder/LightGreen/*.jpg",
+                                                                  "../TrainingImagesFolder/DarkGreen/*.jpg",
+                                                                  "../TrainingImagesFolder/Red/*.jpg",
+                                                                  "../TrainingImagesFolder/Orange/*.jpg",
+                                                                  "../TrainingImagesFolder/Yellow/*.jpg",
+                                                                  "../TrainingImagesFolder/White/*.jpg"
+    };
 
     static const constexpr char* getBrickColour(const BrickColour& brickColour)
     {
@@ -64,5 +78,6 @@ namespace BrickCV
         }
     }
 
-    static const constexpr BrickColour sc_coloursInUse[] = { PURPLE, DARK_BLUE, LIGHT_BLUE, LIGHT_GREEN, BROWN, RED, ORANGE, YELLOW, DARK_GREEN };
+    //this array should contain the colours available in the top area or lego plate in order, igonoring the first white brick
+    static const constexpr BrickColour sc_coloursInUse[] = { PURPLE, DARK_BLUE, LIGHT_BLUE, BROWN, RED, ORANGE, YELLOW, LIGHT_GREEN, DARK_GREEN, WHITE };
 }
