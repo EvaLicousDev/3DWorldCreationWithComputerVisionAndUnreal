@@ -88,7 +88,6 @@ namespace PreProcessor
         void     display(cv::Mat& image, const char* frameName, int pixels);
         void     displayRGBChannels();
         void     displayHSVChannels();
-     //   void     displayHSVChannelsAndOriginal();
         void     displayLABChannels();
         void     displayLUVChannels();
 

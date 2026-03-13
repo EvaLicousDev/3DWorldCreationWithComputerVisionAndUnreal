@@ -21,7 +21,7 @@ int main()
     // TAKE LAB CHANNEL AND ITTERATIVELY FIND THRESHOLD until large white rectangle is found
     // From that rectangle we section the image upwards, taking only the width of the white rectangle and moving it up into the colour example space
         // Now we use the BlueYellow channel (because the colour order is based on the *typical order of the B channels values from Dark to light)
-        // Iterating over the BlueYellow channel we go form 0-256 until we find a rectangle-ish formation
+        // Iterating over the BlueYellow channel we go form 0-255 until we find a rectangle-ish formation
             // If the formation is square blue and purple were picked up at the same time (Axis channel will confirm which is which)
             // If the formation is rectengular we know we found the first of the two 
                 // We then record the lower bound for the first colour (purple) and create a mask for it
@@ -131,6 +131,7 @@ int main()
         cv::Mat exampleBricks = unblurred(thresholdingROI);
         cv::Mat exampleBricksBlurred = blurred(thresholdingROI);
 
+        demo = true; 
         if (demo)
         {
             imshow("PLate mask", legoROI);
@@ -165,11 +166,15 @@ int main()
 
         mserOutMask = processor.getMSERMask(unprocessedROI);
         cv::medianBlur(mserOutMask, mserOutMask, 3);
+        auto sobel =  processor.applySobel(mserOutMask);
+        medianBlur(sobel, sobel, 3);
+        sobel = processor.applySobel(sobel);
         processor.getContourData(mserOutMask, true);
+
 
         if (demo)
         {
-            imshow("MSER contours", processor.getDrawnContours());
+            imshow("MSER contours canny", processor.getDrawnContours());
             imshow("Feature detection", mserOutMask);
             cv::waitKey(0);
         }
@@ -196,13 +201,12 @@ int main()
                 cv::putText(showPixls, name, text, cv::FONT_HERSHEY_COMPLEX, 2, CV_RGB(255, 50, 100), 2);
                 cv::imshow("Brick", brickMat);
                 cv::imshow("Assumed area", showPixls);
-                cv::waitKey(2);
+                cv::waitKey(0);
             }
 
             cv::Mat res;
             cv::matchTemplate(unprocessedROI, brickMat, res, TemplateMatchModes::TM_SQDIFF_NORMED);
-            //cv::threshold(res, res, 0, 100, THRESH_MASK);
-            imshow("matched", res);
+            imshow("template back projection", res);
             cv::waitKey(2);
         }
     }

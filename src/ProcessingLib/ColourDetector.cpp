@@ -38,16 +38,22 @@ cv::Mat AbsColourDistance::ColourDetector::processChannel(const cv::Mat image, c
 //use euclidian distance to example HTML shades to decide colour
 const BrickColour AbsColourDistance::ColourDetector::getBrickApproximation(const cv::Mat& colourSample)
 {
-    cv::Scalar avarage = cv::mean(colourSample);
-    auto meanColour = cv::mean(colourSample);
+    cv::Mat labColour;
+    cv::cvtColor(colourSample, labColour, cv::COLOR_BGR2Lab);
+    auto meanColour = cv::mean(labColour);
     BrickColour bestMatch = BrickColour::BLACK; 
-    double distance = 9999999; 
+    double distance = 9999999;
+
     for (const auto colour : vectorNames)
     {
         auto colourVector = exampleBrickShades[colour];
         for (const auto shade : colourVector)
         {
             auto shadeScalar = getBGRColour(shade);
+            cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, shadeScalar);
+            cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
+            shadeScalar = cv::mean(rgbToLab);
+
             double distanceToEachOther = cv::norm(shadeScalar, meanColour);
             if (distanceToEachOther < distance)
             {

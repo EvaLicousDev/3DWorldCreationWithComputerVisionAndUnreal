@@ -246,7 +246,7 @@ cv::Rect PreProcessor::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imag
 
 // The following function is based on https://stackoverflow.com/questions/54948836/findcontours-and-retr-tree-iterate-through-hierarchy
 // Theory - find contours RETR_TREE outputs a hirarchy. We want to find the inside elements on the black tray. Therefor we are looking for
-//         the largest square shaped contour on level 1 with children
+//          the largest square shaped contour on level 1 with children
 // For more informations on how hirarchy is structured, please visit "https://docs.opencv.org/3.4/d9/d8b/tutorial_py_contours_hierarchy.html"
 cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
 {
@@ -384,7 +384,6 @@ std::shared_ptr<cv::Rect> PreProcessor::ImageProcessor::findLargestSquareInsideB
 
     auto output = this->findLargestVoliumChild(hirarchy, contours, blackTrayMask, showAllRect);
     setXCoordinatesForWhiteBricks(hirarchy, contours, blackTrayMask, false); 
-    //bool isValid = isWithinTollerance(output); 
     double ratio = static_cast<double>(output.width) / static_cast<double>(output.height);
     auto isSquare = ratio >= 1.2 || ratio <= 0.8; 
 
@@ -473,7 +472,7 @@ bool PreProcessor::ImageProcessor::isWithinTollerance(cv::Rect& output)
     else
     {
         Errors::ErrorOutput(Errors::BrickCVErrors::FUNCTION_CALLED_TOO_SOON, "If this is called before the X values for the white bricks are set this will return an invalid result and produce undefined behavious.");
-        CV_Assert(leftWhiteMarkerTL_X != -1 && rightWhiteMarkerTR_X != -1, "Invalid result due to invalid function call order"); 
+//        CV_Assert(leftWhiteMarkerTL_X != -1 && rightWhiteMarkerTR_X != -1, "Invalid result due to invalid function call order"); 
         return false; 
     }
 }
@@ -534,30 +533,30 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
     cv::Mat* axisCh = &labImageCh[1];
     cv::Mat* byCh = &labImageCh[2];
 
-    cv::waitKey(0);
-
     auto axisHist = Histogram::ColourHistogram(BrickCV::BrickColour::RED, BrickCV::ChannelType::LAB_AXIS, labROIch[1]); 
     auto blueYellowHist = Histogram::ColourHistogram(BrickCV::BrickColour::RED, BrickCV::ChannelType::LAB_BLUE_YELLOW, labROIch[2]);
 
-    auto redAxisHist = axisHist.getHistogram().lock(); 
-    if (redAxisHist != nullptr)
+    auto redGreenAxisHist = axisHist.getHistogram().lock(); 
+    if (redGreenAxisHist != nullptr)
     {
-        cv::Mat redHistObj = redAxisHist->getHistogram();
+        cv::Mat axisHistogramObj = redGreenAxisHist->getHistogram();
 
         float hrange[] = { 0.0, 256.0 };
         const float* range[] = { hrange };
         int channels[] = { 0 };
-        cv::calcBackProject(axisCh, 1, channels, redHistObj, colourMatch, range);
-        cv::threshold(colourMatch, colourMatch, threshold, 255, cv::THRESH_BINARY);
+        cv::calcBackProject(axisCh, 1, channels, axisHistogramObj, colourMatch, range);
+        double min = 0, max = 0;
+        cv::minMaxLoc(axisHistogramObj, &min, &max, 0, 0);
+        cv::threshold(colourMatch, colourMatch, min, max, cv::THRESH_BINARY);
 
         auto lockedBlueYellowHist = blueYellowHist.getHistogram().lock(); 
         if (lockedBlueYellowHist != nullptr)
         {
             cv::Mat colourMatch2; 
             cv::Mat blueYellowHistObj = lockedBlueYellowHist->getHistogram();
-
+            cv::minMaxLoc(blueYellowHistObj, &min, &max, 0, 0);
             cv::calcBackProject(byCh, 1, channels, blueYellowHistObj, colourMatch2, range);
-            cv::threshold(colourMatch2, colourMatch2, threshold, 255, cv::THRESH_BINARY);
+            cv::threshold(colourMatch2, colourMatch2, min, max, cv::THRESH_BINARY);
 
             cv::Mat result; 
             cv::add(colourMatch, colourMatch2, result, cv::Mat(), -1);
