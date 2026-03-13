@@ -24,7 +24,7 @@ namespace brickColourSVM
     struct UnprocessedTrainingDataInstance
     {
         UnprocessedTrainingDataInstance() = default; 
-        UnprocessedTrainingDataInstance(const char* path, BrickCV::BrickColour colour)
+        UnprocessedTrainingDataInstance(const cv::String path, BrickCV::BrickColour colour)
         {
             //get image
             cv::Mat imageToProcess = cv::imread(path, cv::ImreadModes::IMREAD_COLOR_BGR);
