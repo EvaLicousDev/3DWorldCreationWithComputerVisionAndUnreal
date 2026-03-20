@@ -28,35 +28,13 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
         drawenContours = cv::Mat(allEdgesAdded.cols, allEdgesAdded.rows, CV_8UC1);
         for (size_t i = 0; i < contours.size(); i++)
         {
-            approxPolyDP(contours[i], filteredContours[i], 4, true);
-            boundRect[i] = boundingRect(filteredContours[i]);
+            boundRect[i] = boundingRect(contours[i]);
+            //approxPolyDP(contours[i], filteredContours[i], 4, true);
         }
-        cv::drawContours(drawenContours, filteredContours, -1, CV_RGB(255,255,255)); 
+        cv::drawContours(drawenContours, contours, -1, CV_RGB(255,255,255)); 
     }
 
-    int numBiggest = 0;
-    int idBiggest  = 0;
-    for (int i = 0; i < boundRect.size(); i++) 
-    {
-        if (boundRect[i].width > numBiggest) {
-            numBiggest = boundRect[i].width;
-            idBiggest = i;
-        }
-    }
-
-    double biggestWidth = boundRect[idBiggest].width;
-    double about1Square = biggestWidth / 32;
-    about1Square = about1Square * 0.98; 
-
-    for (size_t i = 0; i < contours.size(); i++)
-    {
-        if (boundRect[i].width >= about1Square && boundRect[i].height >= about1Square)
-        {
-            filteredRect.emplace_back(boundRect[i]);
-        }
-    }
-
-    this->m_boundRect = std::make_shared<std::vector<cv::Rect>>(filteredRect);
+    this->m_boundRect = std::make_shared<std::vector<cv::Rect>>(boundRect);
     this->m_contours_poly = std::make_shared<std::vector<std::vector<cv::Point>>>(filteredContours);
 }
 
@@ -127,25 +105,30 @@ cv::Rect PreProcessor::ImageProcessor::findSquareIsh(const std::vector<cv::Point
     return cv::Rect(0,0,0,0); 
 }
 
-cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage)
+cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool showAreas /* = false */)
 {
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
-    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 20, ((unblurredImage.cols*unblurredImage.rows)/2),0.25 );
+    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 9, ((unblurredImage.cols*unblurredImage.rows)),0.1 );
 
-    std::vector<std::vector<cv::Point> > regions;
-    std::vector<cv::Rect> mser_bbox;
-    mserAlgorithm->detectRegions(unblurredImage, regions, mser_bbox);
+    std::vector<std::vector<cv::Point> > mserContours;
+    std::vector<cv::Rect> mserRegions;
+    mserAlgorithm->detectRegions(unblurredImage, mserContours, mserRegions);
 
-    for (std::vector<cv::Point> v : regions) 
+    uchar colourValue = 0; 
+    for (std::vector<cv::Point> pointVector : mserContours) 
     {
-        for (cv::Point p : v) {
-            mserMask.at<uchar>(p.y, p.x) = 255;
+        for (cv::Point point : pointVector) {
+            mserMask.at<uchar>(point.y, point.x) = colourValue;
         }
+        colourValue += showAreas ? 5 : 0;
     }
 
-    cv::threshold(mserMask, mserMask, 252, 255, cv::THRESH_BINARY); 
     this->mserMask = std::make_shared<cv::Mat>(mserMask); 
+
+    if (showAreas) cv::imshow("Mazimally stable extremal regions - greyscale (up to 25 regions shown)", mserMask);
+    if (showAreas) cv::waitKey(0);
+
     return mserMask; 
 }
 
@@ -246,7 +229,7 @@ cv::Rect PreProcessor::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imag
 
 // The following function is based on https://stackoverflow.com/questions/54948836/findcontours-and-retr-tree-iterate-through-hierarchy
 // Theory - find contours RETR_TREE outputs a hirarchy. We want to find the inside elements on the black tray. Therefor we are looking for
-//          the largest square shaped contour on level 1 with children
+//         the largest square shaped contour on level 1 with children
 // For more informations on how hirarchy is structured, please visit "https://docs.opencv.org/3.4/d9/d8b/tutorial_py_contours_hierarchy.html"
 cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
 {
@@ -254,8 +237,6 @@ cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Ve
 
     for (int parentIdx(0); parentIdx >= 0; parentIdx = hierarchy[parentIdx][NEXT_SIBLING]) 
     {
-        //CV_Assert(hierarchy[parentIdx][PARENT_CONTOUR] == -1, "Must be top level hirarchy element");
-
         //Not interrested in contours with no children
         if (hierarchy[parentIdx][CHILD_CONTOUR] == -1) {
             if (showResult)
@@ -282,10 +263,12 @@ cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Ve
                 auto drawRect = cv::boundingRect(contours[childIDx]);
                 cv::rectangle(roi, drawRect, cv::Scalar(0, 255, 0));
             }
+
+            //TO DO: CHANGE LOGIC 
             cv::Rect square = findSquareIsh(contours[childIDx]);
             if (square.width*square.height > maxVol) 
             {
-                //We found a square with children, so hopefully the plate
+                //We found a square-ish with children, so hopefully the plate
                 outRect =  cv::boundingRect(contours[childIDx]); 
                 maxVol = square.width * square.height;
             }
@@ -294,10 +277,54 @@ cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Ve
         if (showResult)
         {
             cv::rectangle(roi, outRect, CV_RGB(50, 100, 150), 2);
-            cv::imshow("Hirarchy Top level = Red, Children = Blue, internal children = Green, bounding box = Other", roi);
+            cv::imshow("Squareish shape found in black area", roi);
             cv::waitKey(0);
         }
         return outRect;
+    }
+    return outRect;
+}
+
+cv::Rect PreProcessor::ImageProcessor::findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult)
+{
+    auto outRect = cv::Rect(0, 0, 0, 0);
+    for (int parentIdx(0); parentIdx >= 0; parentIdx = hierarchy[parentIdx][NEXT_SIBLING])
+    {
+        //Not interrested in contours with no children
+        if (hierarchy[parentIdx][CHILD_CONTOUR] == -1) {
+            if (showResult)
+            {
+                auto drawRect = cv::boundingRect(contours[parentIdx]);
+                cv::rectangle(preProcessedGrey, drawRect, cv::Scalar(255, 0, 0));
+            }
+            continue;
+        }
+
+        if (showResult)
+        {
+            int contourIDx = hierarchy[parentIdx][CHILD_CONTOUR];
+            auto drawRect = cv::boundingRect(contours[contourIDx]);
+            cv::rectangle(preProcessedGrey, drawRect, cv::Scalar(0, 0, 255));
+        } 
+
+        int childcontours = 0;
+        std::vector<std::vector<cv::Point>> childrenWith6Points;
+        for (int childIDx(hierarchy[parentIdx][CHILD_CONTOUR]); childIDx >= 0; childIDx = hierarchy[childIDx][NEXT_SIBLING]) 
+        {
+            //not interested in any non corner contours with less than 6 points
+            childrenWith6Points.emplace_back(contours[childIDx]);
+            childcontours++;
+        }
+
+        if (showResult)
+        {
+            for (auto cont : childrenWith6Points)
+            {
+                cv::rectangle(preProcessedGrey, cv::boundingRect(cont), CV_RGB(50, 100, 150), 3);
+            }
+            cv::imshow("Child boxes internal found", preProcessedGrey);
+            cv::waitKey(0);
+        }
     }
     return outRect;
 }
@@ -350,55 +377,246 @@ void PreProcessor::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv:
 }
 
 
-// returns a nullptr if lego plate cannot be found
-std::shared_ptr<cv::Rect> PreProcessor::ImageProcessor::findLargestSquareInsideBlackTray(cv::Mat imageToProcess, bool showBlackMask /* = false */, bool showAllRect /* = false */) {
-    //isolate red channel and threshold
-    cv::Mat greyScale;
-    cv::cvtColor(imageToProcess, greyScale, cv::COLOR_BGR2GRAY);
-
-    cv::Mat blackTrayMask;
-    cv::inRange(greyScale, 0, 50, blackTrayMask);
+/*
+* This function is large, but simple
+* We take all of the contours, find the biggest one, and **ASSUME** it roughly covers the lego plate if we create a bounding rectangle around it.
+* We then create a center point, and use basic trigonomitry to find the best match for corners of the lego plate 
+*/
+std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv::Mat original, cv::Mat& greyScaleGreenChannel, bool showBlackMask /* = false */, bool showAllRect /* = false */) 
+{
+    cv::Mat blackTrayMask = greyScaleGreenChannel;
+    blackTrayMask = this->applySobel(blackTrayMask);
 
     if (showBlackMask)
     {
-        cv::imshow("Black Tray", blackTrayMask);
+        cv::imshow("Sobel contours", blackTrayMask);
         cv::waitKey(0);
     }
 
-    //find contours in thresholded
+    // find contours 
+    // the largest contour should be our lego plate
+    // it's bounding rectangle at least should enable us to find any missing points 
     std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hirarchy; 
-    cv::findContours(blackTrayMask, contours, hirarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(blackTrayMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
     std::vector<std::vector<cv::Point>> rectangleCont(contours.size());
     std::vector<cv::Rect> boundRect(contours.size());
 
-    if (showAllRect)
+    double maxContourVolium = 0;
+    int maxContourID = 0;
+    int colour = 0;
+    for (int contourIndex = 0; contourIndex < contours.size(); contourIndex++)
     {
-        for (size_t i = 0; i < contours.size(); i++)
+        if (showAllRect)
         {
-            approxPolyDP(contours[i], rectangleCont[i], 4, true);
-            boundRect[i] = cv::boundingRect(rectangleCont[i]);
-            cv::rectangle(imageToProcess, boundRect[i], CV_RGB(255, 0, 0), 2);
+            cv::drawContours(original, contours, contourIndex, CV_RGB(50, colour, 200), 3);
+            colour = (colour < 230 ? colour + 10 : 255);
+        }
+
+        boundRect[contourIndex] = cv::boundingRect(contours[contourIndex]);
+        double newArea = cv::contourArea(contours.at(contourIndex));
+        if (newArea > maxContourVolium)
+        {
+            maxContourID = contourIndex;
+            maxContourVolium = newArea;
         }
     }
 
-    auto output = this->findLargestVoliumChild(hirarchy, contours, blackTrayMask, showAllRect);
-    setXCoordinatesForWhiteBricks(hirarchy, contours, blackTrayMask, false); 
-    double ratio = static_cast<double>(output.width) / static_cast<double>(output.height);
-    auto isSquare = ratio >= 1.2 || ratio <= 0.8; 
+    // create point in middle. If we debug show this frame, it will be displayed in a reddish shade
+    auto largest = cv::boundingRect(contours[maxContourID]);
+    m_biggestRect = std::make_shared<cv::Rect>(largest);
+    cv::Point centerOfLargest((largest.tl().x + largest.width / 2), (largest.tl().y + largest.height / 2));
 
-    if (!isSquare) //Try fallback
+    if (showAllRect)
     {
-        output = getPlateWithGreenChannel(imageToProcess, true);
-        isSquare = (output.width + output.height) != 0;
+        cv::circle(original, centerOfLargest, 6, CV_RGB(100, 20, 50), cv::FILLED);
+        cv::drawContours(original, contours, maxContourID, CV_RGB(200, 50, 200), 3);
+        cv::rectangle(original, largest, CV_RGB(150, 200, 0), 3);
     }
 
-    if (isSquare) return std::make_shared<cv::Rect>(output);
+    auto perimiter = cv::arcLength(contours[maxContourID], true);
+    std::vector<cv::Point> largestCorners;
+    cv::approxPolyDP(contours[maxContourID], largestCorners, perimiter * 0.1, true); //epsilon is generous
 
-    return nullptr;
+    if (largestCorners.size() <= 4)
+    {
+        // we use the center of the bounding rectangle to see what points we have and which are missing
+        // we order them top left, top right, bottom right, bottom left as needed by the openCV function that creates the warp matrix
+        cv::Point orderdPoints[4];
+        bool foundTopLeft = false;
+        bool foundBotLeft = false;
+        bool foundTopRight = false;
+        bool foundBotRight = false;
+
+        //find top left 
+        for (auto point : largestCorners)
+        {
+            if (point.x < centerOfLargest.x && point.y < centerOfLargest.y)
+            {
+                orderdPoints[0] = point;
+                foundTopLeft = true;
+            }
+        }
+
+        //find top right 
+        for (auto point : largestCorners)
+        {
+            if (point.x > centerOfLargest.x && point.y < centerOfLargest.y)
+            {
+                orderdPoints[1] = point;
+                foundTopRight = true;
+            }
+        }
+
+        //find bottom right 
+        for (auto point : largestCorners)
+        {
+            if (point.x > centerOfLargest.x && point.y > centerOfLargest.y)
+            {
+                orderdPoints[2] = point;
+                foundBotRight = true;
+            }
+        }
+
+        //find bottom left
+        for (auto point : largestCorners)
+        {
+            if (point.x < centerOfLargest.x && point.y > centerOfLargest.y)
+            {
+                orderdPoints[3] = point;
+                foundBotLeft = true;
+            }
+        }
+
+        // if we have less than 4 points we need to find the missing points
+        // once all are found we emplace them according to the order we require for the warp matrix 
+        if (!foundTopLeft)  orderdPoints[0] = findTL(contours, centerOfLargest);
+        if (!foundTopRight) orderdPoints[1] = findTR(contours, centerOfLargest);
+        if (!foundBotRight) orderdPoints[2] = findBR(contours, centerOfLargest);
+        if (!foundBotLeft)  orderdPoints[3] = findBL(contours, centerOfLargest);
+        largestCorners.clear();
+        largestCorners.emplace_back(orderdPoints[0]);
+        largestCorners.emplace_back(orderdPoints[1]);
+        largestCorners.emplace_back(orderdPoints[2]);
+        largestCorners.emplace_back(orderdPoints[3]);
+
+        if (showAllRect)
+        {
+            auto colour = 0;
+            for (auto point : largestCorners)
+            {
+                // colours clockwise from TL to BR go from yellow to pink
+                cv::circle(original, point, 5, CV_RGB(255, 200 - colour, colour), cv::FILLED);
+                colour += 45;
+            }
+            cv::imshow("Points detected", original);
+            cv::waitKey(0);
+        }
+        return largestCorners;
+    }
+    else
+    {
+        if (showAllRect)
+        {
+            cv::imshow("More than 4 points detected, this will fail", original);
+            cv::waitKey(0);
+        }
+    }
+    return std::vector<cv::Point>();
 }
 
-/* 
+cv::Point PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+{
+    //x has to be smaller and y has to be smaller, and distance to middle maximised
+    double distanceSquared = 0; 
+    cv::Point out(0,0); 
+    for (auto cont : contours)
+    {
+        for (auto point : cont)
+        {
+            if (point.x < middle.x && point.y < middle.y)
+            {
+                double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((middle.y - point.y) ^ 2); 
+                if (pointDistanceSquared > distanceSquared)
+                {
+                    out = point; 
+                    distanceSquared = pointDistanceSquared; 
+                }
+            }
+        }
+    }
+    return out; 
+}
+
+cv::Point PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+{
+    //x has to be bigger and y has to be smaller, and distance to middle maximised
+    double distanceSquared = 0;
+    cv::Point out(0, 0);
+    for (auto cont : contours)
+    {
+        for (auto point : cont)
+        {
+            if (point.x > middle.x && point.y < middle.y)
+            {
+                double pointDistanceSquared = ((point.x-middle.x) ^ 2) + ((middle.y - point.y) ^ 2);
+                if (pointDistanceSquared > distanceSquared)
+                {
+                    out = point;
+                    distanceSquared = pointDistanceSquared;
+                }
+            }
+        }
+    }
+    return out;
+}
+
+cv::Point PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+{
+    //x has to be smaller and y has to be bigger, and distance to middle maximised
+    double distanceSquared = 0;
+    cv::Point out(0, 0);
+    for (auto cont : contours)
+    {
+        for (auto point : cont)
+        {
+            if (point.x < middle.x && point.y > middle.y)
+            {
+                double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((point.y- middle.y) ^ 2);
+                if (pointDistanceSquared > distanceSquared)
+                {
+                    out = point;
+                    distanceSquared = pointDistanceSquared;
+                }
+            }
+        }
+    }
+    return out;
+}
+
+cv::Point PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+{
+    //x has to be sigger and y has to be bigger, and distance to middle maximised
+    double distanceSquared = 0;
+    cv::Point out(0, 0);
+    for (auto cont : contours)
+    {
+        for (auto point : cont)
+        {
+            if (point.x > middle.x && point.y > middle.y)
+            {
+                double pointDistanceSquared = ((point.x - middle.x) ^ 2) + ((point.y - middle.y) ^ 2);
+                if (pointDistanceSquared > distanceSquared)
+                {
+                    out = point;
+                    distanceSquared = pointDistanceSquared;
+                }
+            }
+        }
+    }
+    return out;
+}
+
+ /*
  * This function capitalises of the base plate being green and still works well in low light with harsh shadows
  * If it fails we want to request another image from the camera
  */
@@ -472,7 +690,7 @@ bool PreProcessor::ImageProcessor::isWithinTollerance(cv::Rect& output)
     else
     {
         Errors::ErrorOutput(Errors::BrickCVErrors::FUNCTION_CALLED_TOO_SOON, "If this is called before the X values for the white bricks are set this will return an invalid result and produce undefined behavious.");
-//        CV_Assert(leftWhiteMarkerTL_X != -1 && rightWhiteMarkerTR_X != -1, "Invalid result due to invalid function call order"); 
+       // CV_Assert(leftWhiteMarkerTL_X != -1 && rightWhiteMarkerTR_X != -1, "Invalid result due to invalid function call order"); 
         return false; 
     }
 }
@@ -533,30 +751,30 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
     cv::Mat* axisCh = &labImageCh[1];
     cv::Mat* byCh = &labImageCh[2];
 
+    cv::waitKey(0);
+
     auto axisHist = Histogram::ColourHistogram(BrickCV::BrickColour::RED, BrickCV::ChannelType::LAB_AXIS, labROIch[1]); 
     auto blueYellowHist = Histogram::ColourHistogram(BrickCV::BrickColour::RED, BrickCV::ChannelType::LAB_BLUE_YELLOW, labROIch[2]);
 
-    auto redGreenAxisHist = axisHist.getHistogram().lock(); 
-    if (redGreenAxisHist != nullptr)
+    auto redAxisHist = axisHist.getHistogram().lock(); 
+    if (redAxisHist != nullptr)
     {
-        cv::Mat axisHistogramObj = redGreenAxisHist->getHistogram();
+        cv::Mat redHistObj = redAxisHist->getHistogram();
 
         float hrange[] = { 0.0, 256.0 };
         const float* range[] = { hrange };
         int channels[] = { 0 };
-        cv::calcBackProject(axisCh, 1, channels, axisHistogramObj, colourMatch, range);
-        double min = 0, max = 0;
-        cv::minMaxLoc(axisHistogramObj, &min, &max, 0, 0);
-        cv::threshold(colourMatch, colourMatch, min, max, cv::THRESH_BINARY);
+        cv::calcBackProject(axisCh, 1, channels, redHistObj, colourMatch, range);
+        cv::threshold(colourMatch, colourMatch, threshold, 255, cv::THRESH_BINARY);
 
         auto lockedBlueYellowHist = blueYellowHist.getHistogram().lock(); 
         if (lockedBlueYellowHist != nullptr)
         {
             cv::Mat colourMatch2; 
             cv::Mat blueYellowHistObj = lockedBlueYellowHist->getHistogram();
-            cv::minMaxLoc(blueYellowHistObj, &min, &max, 0, 0);
+
             cv::calcBackProject(byCh, 1, channels, blueYellowHistObj, colourMatch2, range);
-            cv::threshold(colourMatch2, colourMatch2, min, max, cv::THRESH_BINARY);
+            cv::threshold(colourMatch2, colourMatch2, threshold, 255, cv::THRESH_BINARY);
 
             cv::Mat result; 
             cv::add(colourMatch, colourMatch2, result, cv::Mat(), -1);
