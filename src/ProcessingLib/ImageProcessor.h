@@ -17,6 +17,13 @@
 #define PARENT_CONTOUR 3
 #define STUDS_PER_PLATE 32
 
+static constexpr size_t channels = 3;
+static constexpr size_t blueOrLuminance = 0;
+static constexpr size_t greenOrAxis = 1;
+static constexpr size_t redOrBlueYellow = 2;
+
+static constexpr size_t approximateLegoKnobPixels = 16;
+
 namespace PreProcessor
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
@@ -64,7 +71,14 @@ namespace PreProcessor
             visualiserInstance.release();
         }
 
-        std::shared_ptr<cv::Rect> findLargestSquareInsideBlackTray(cv::Mat imageToProcess, bool showBlackMask = false, bool showAllRect = false);
+        std::weak_ptr<cv::Rect> getPlateRectangle() { return m_biggestRect; }
+        std::vector<cv::Point> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
+        cv::Rect findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
+
+        cv::Point findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
 
         cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
@@ -76,6 +90,7 @@ namespace PreProcessor
         void setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
 
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
+       // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
         cv::Mat applyCannyToBGR(cv::Mat& blurredBGR);
         cv::Mat applyCannyTo1D(cv::Mat& blurredGrey, int threshold);
         void    setContouringThresholds(cv::Mat& blurredGreyscale);
@@ -85,8 +100,7 @@ namespace PreProcessor
         cv::Mat createThresholdMask(cv::Mat& greyImage);
         cv::Mat backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold); 
         
-        //image processing functions using pixle wise operations - adapted from the OpenCV Cookbook 
-        //https://books.google.nl/books?hl=ru&lr=&id=ZVqWDwAAQBAJ&oi=fnd&pg=PP1&dq=Opencv+c%2B%2B+cookbook&ots=CmT5y-Y0R4&sig=D9J9yO7uq_Wr_UGOsV3nKCdl1Fk&redir_esc=y#v=onepage&q&f=false
+        //image processing functions using pixle wise operations
         cv::Mat naiveRgbColourSpaceReduction(cv::Mat& image,   int divideBy = 16);
         cv::Mat naiveRgbColourSpaceReduction2(cv::Mat& image,  int divideBy = 16);
         cv::Mat bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy = 16);
@@ -102,7 +116,7 @@ namespace PreProcessor
         cv::Mat& getMainImage() { return *in_image; }
 
         void    debugInfo(cv::Mat& image);
-        cv::Mat getMSERMask(cv::Mat unblurredImage);
+        cv::Mat getMSERMask(cv::Mat unblurredImage, bool showAreas = false);
         cv::Mat addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser);
 
         cv::Mat                                               getDrawnContours() { return drawenContours; }
@@ -112,6 +126,8 @@ namespace PreProcessor
 
     private:
         bool isWithinTollerance(cv::Rect& output); 
+
+       // cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
         int leftWhiteMarkerTL_X = -1; 
         int rightWhiteMarkerTR_X = -1; 
 
@@ -130,10 +146,11 @@ namespace PreProcessor
         std::shared_ptr<std::vector<cv::Rect>>               m_boundRect     = nullptr;
 
         cv::Mat drawenContours;
-        cv::Rect* m_biggestRect = nullptr; 
+        std::shared_ptr<cv::Rect> m_biggestRect = nullptr; 
 
         double controurThreshMax    = 0;
         double controurThreshMin    = 0;
         double controurThreshMiddle = 0;
+        //cv::Mat createColourLocationImageBW(int maxDistance, const cv::Vec3b& tragetColour);
     };
 }
