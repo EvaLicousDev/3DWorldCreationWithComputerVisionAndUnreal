@@ -382,8 +382,14 @@ void PreProcessor::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv:
 * We take all of the contours, find the biggest one, and **ASSUME** it roughly covers the lego plate if we create a bounding rectangle around it.
 * We then create a center point, and use basic trigonomitry to find the best match for corners of the lego plate 
 */
-std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv::Mat original, cv::Mat& greyScaleGreenChannel, bool showBlackMask /* = false */, bool showAllRect /* = false */) 
+std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(cv::Mat original, cv::Mat& greyScaleGreenChannel, bool showBlackMask /* = false */, bool showAllRect /* = false */) 
 {
+    cv::Mat orig;
+    if (showAllRect)
+    {
+        original.copyTo(orig);
+    }
+
     cv::Mat blackTrayMask = greyScaleGreenChannel;
     blackTrayMask = this->applySobel(blackTrayMask);
 
@@ -398,7 +404,6 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
     // it's bounding rectangle at least should enable us to find any missing points 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(blackTrayMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-    std::vector<std::vector<cv::Point>> rectangleCont(contours.size());
     std::vector<cv::Rect> boundRect(contours.size());
 
     double maxContourVolium = 0;
@@ -408,7 +413,7 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
     {
         if (showAllRect)
         {
-            cv::drawContours(original, contours, contourIndex, CV_RGB(50, colour, 200), 3);
+            cv::drawContours(orig, contours, contourIndex, CV_RGB(50, colour, 200), 3);
             colour = (colour < 230 ? colour + 10 : 255);
         }
 
@@ -424,24 +429,24 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
     // create point in middle. If we debug show this frame, it will be displayed in a reddish shade
     auto largest = cv::boundingRect(contours[maxContourID]);
     m_biggestRect = std::make_shared<cv::Rect>(largest);
-    cv::Point centerOfLargest((largest.tl().x + largest.width / 2), (largest.tl().y + largest.height / 2));
+    cv::Point2f centerOfLargest(static_cast<float>((largest.tl().x + largest.width / 2)), static_cast<float>((largest.tl().y + largest.height / 2)));
 
     if (showAllRect)
     {
-        cv::circle(original, centerOfLargest, 6, CV_RGB(100, 20, 50), cv::FILLED);
-        cv::drawContours(original, contours, maxContourID, CV_RGB(200, 50, 200), 3);
-        cv::rectangle(original, largest, CV_RGB(150, 200, 0), 3);
+        cv::circle(orig, centerOfLargest, 6, CV_RGB(100, 20, 50), cv::FILLED);
+        cv::drawContours(orig, contours, maxContourID, CV_RGB(200, 50, 200), 3);
+        cv::rectangle(orig, largest, CV_RGB(150, 200, 0), 3);
     }
 
     auto perimiter = cv::arcLength(contours[maxContourID], true);
-    std::vector<cv::Point> largestCorners;
+    std::vector<cv::Point2f> largestCorners;
     cv::approxPolyDP(contours[maxContourID], largestCorners, perimiter * 0.1, true); //epsilon is generous
 
     if (largestCorners.size() <= 4)
     {
         // we use the center of the bounding rectangle to see what points we have and which are missing
         // we order them top left, top right, bottom right, bottom left as needed by the openCV function that creates the warp matrix
-        cv::Point orderdPoints[4];
+        cv::Point2f orderdPoints[4];
         bool foundTopLeft = false;
         bool foundBotLeft = false;
         bool foundTopRight = false;
@@ -452,7 +457,7 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
         {
             if (point.x < centerOfLargest.x && point.y < centerOfLargest.y)
             {
-                orderdPoints[0] = point;
+                orderdPoints[0] = cv::Point2f(point);
                 foundTopLeft = true;
             }
         }
@@ -462,7 +467,7 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
         {
             if (point.x > centerOfLargest.x && point.y < centerOfLargest.y)
             {
-                orderdPoints[1] = point;
+                orderdPoints[1] = cv::Point2f(point);
                 foundTopRight = true;
             }
         }
@@ -472,7 +477,7 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
         {
             if (point.x > centerOfLargest.x && point.y > centerOfLargest.y)
             {
-                orderdPoints[2] = point;
+                orderdPoints[2] = cv::Point2f(point);
                 foundBotRight = true;
             }
         }
@@ -482,7 +487,7 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
         {
             if (point.x < centerOfLargest.x && point.y > centerOfLargest.y)
             {
-                orderdPoints[3] = point;
+                orderdPoints[3] = cv::Point2f(point);
                 foundBotLeft = true;
             }
         }
@@ -505,10 +510,10 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
             for (auto point : largestCorners)
             {
                 // colours clockwise from TL to BR go from yellow to pink
-                cv::circle(original, point, 5, CV_RGB(255, 200 - colour, colour), cv::FILLED);
+                cv::circle(orig, point, 5, CV_RGB(255, 200 - colour, colour), cv::FILLED);
                 colour += 45;
             }
-            cv::imshow("Points detected", original);
+            cv::imshow("Points detected", orig);
             cv::waitKey(0);
         }
         return largestCorners;
@@ -517,14 +522,14 @@ std::vector<cv::Point> PreProcessor::ImageProcessor::useContoursToFindCorners(cv
     {
         if (showAllRect)
         {
-            cv::imshow("More than 4 points detected, this will fail", original);
+            cv::imshow("More than 4 points detected, this will fail", orig);
             cv::waitKey(0);
         }
     }
-    return std::vector<cv::Point>();
+    return std::vector<cv::Point2f>();
 }
 
-cv::Point PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be smaller and y has to be smaller, and distance to middle maximised
     double distanceSquared = 0; 
@@ -538,7 +543,7 @@ cv::Point PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point
                 double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((middle.y - point.y) ^ 2); 
                 if (pointDistanceSquared > distanceSquared)
                 {
-                    out = point; 
+                    out = cv::Point2f(point);
                     distanceSquared = pointDistanceSquared; 
                 }
             }
@@ -547,7 +552,7 @@ cv::Point PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point
     return out; 
 }
 
-cv::Point PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be bigger and y has to be smaller, and distance to middle maximised
     double distanceSquared = 0;
@@ -561,7 +566,7 @@ cv::Point PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point
                 double pointDistanceSquared = ((point.x-middle.x) ^ 2) + ((middle.y - point.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
                 {
-                    out = point;
+                    out = cv::Point2f(point);
                     distanceSquared = pointDistanceSquared;
                 }
             }
@@ -570,7 +575,7 @@ cv::Point PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point
     return out;
 }
 
-cv::Point PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be smaller and y has to be bigger, and distance to middle maximised
     double distanceSquared = 0;
@@ -584,7 +589,7 @@ cv::Point PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point
                 double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((point.y- middle.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
                 {
-                    out = point;
+                    out = cv::Point2f(point);
                     distanceSquared = pointDistanceSquared;
                 }
             }
@@ -593,7 +598,7 @@ cv::Point PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point
     return out;
 }
 
-cv::Point PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be sigger and y has to be bigger, and distance to middle maximised
     double distanceSquared = 0;
@@ -607,7 +612,7 @@ cv::Point PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Point
                 double pointDistanceSquared = ((point.x - middle.x) ^ 2) + ((point.y - middle.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
                 {
-                    out = point;
+                    out = cv::Point2f(point);
                     distanceSquared = pointDistanceSquared;
                 }
             }
