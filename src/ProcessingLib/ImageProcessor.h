@@ -72,13 +72,13 @@ namespace PreProcessor
         }
 
         std::weak_ptr<cv::Rect> getPlateRectangle() { return m_biggestRect; }
-        std::vector<cv::Point> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
+        std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
         cv::Rect findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
 
-        cv::Point findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
-        cv::Point findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
-        cv::Point findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
-        cv::Point findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point2f findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point2f findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point2f findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
+        cv::Point2f findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
 
         cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
