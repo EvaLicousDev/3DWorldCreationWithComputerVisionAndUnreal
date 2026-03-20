@@ -18,6 +18,51 @@ using namespace PreProcessor;
 
 int main()
 {
+    // TAKE LAB CHANNEL AND ITTERATIVELY FIND THRESHOLD until large white rectangle is found
+    // From that rectangle we section the image upwards, taking only the width of the white rectangle and moving it up into the colour example space
+        // Now we use the BlueYellow channel (because the colour order is based on the *typical order of the B channels values from Dark to light)
+        // Iterating over the BlueYellow channel we go form 0-256 until we find a rectangle-ish formation
+            // If the formation is square blue and purple were picked up at the same time (Axis channel will confirm which is which)
+            // If the formation is rectengular we know we found the first of the two 
+                // We then record the lower bound for the first colour (purple) and create a mask for it
+                // This mask is then checked every step in a central position until the value of a small selection of pixls are 0 again
+                // Then we record the upper bound for that colour
+            // As we increase the pixel value upper and lower bounds we repeat this until we have 8 colours thresholded in A & B 
+
+    //SUGGESTED ALG
+    /*
+     *Pre alg: 
+     * 1. Get 5-10 example images of all colours
+     * 2. Calculate histograms of isolated colour bricks
+     *
+     *Main:
+     * 1. Find square and apply transform
+     * 2. Use B/W bounderies to find threshold area of colours
+     *      a. create areas of interest through finding widest bounding box of 4 sided shape
+     * 3. Create mask to just use square
+     *      a. reduce BGR colour space to 32-64 colours
+     *      b. blur image heavily with k-means based on pixle transform and resize
+     *      c. use red channel to isolate high green values and create a mask for the background
+     *          i. create threshold mask by setting all pixles to either 0 or 255 if value < 25
+     *      d. transform image to LAB
+     *      e. use histogram back projection to threshold all colours
+     *          i. for every colour's bounding box 
+     *              1. use A & B channels to calculate likelyhood mask
+     *              2. combine likelyhood masks for all colours for both channels
+     *      f. Filter through bounding boxes of appropriate size > than min num pixls
+     *          i. apply colour lable 1-8
+     *      g. return coordinates & shapes of results
+     */
+
+    //Blue Yellow Red Purple LightGreen
+
+    /*
+     * Colour order at top of board:
+     *
+     * Purple
+     * DarkBlue
+     */
+
     std::cout << "Starting Preprocessing" << std::endl;
     //Example images
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
@@ -25,6 +70,30 @@ int main()
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
     const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
+
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY_2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK_Test.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY2.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/NORM_DARK.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_CAM2.jpg"
+
+
+    //Example bricks
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Purple.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_LightGreen.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink2.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_DarkBlue.jpg";
+    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Head.jpg";
+
+
+    //Get the desired image from location 
+    //cv::namedWindow("Image to process NO BLUR");
 
     //---------------------------------------------------------
     bool demo = true; 
@@ -35,6 +104,9 @@ int main()
     //resize image and set up processor
     auto processor = ImageProcessor(imageToProcess);
     imageToProcess = processor.reseizeImage(imageToProcess);
+
+    if (demo) cv::imshow("currently processing this image", imageToProcess);
+    if (demo) cv::waitKey(0);
 
     //prepare blurred
     cv::Mat blurr; 
@@ -77,13 +149,11 @@ int main()
     if (demo) waitKey(0);
 
     cv::Mat mserOutMask;
-
-    // mserOutMask = processor.getMSERMask(finalMask);
     cv::Mat greenChanFinal[3]; 
     cv::split(noLowRedGreen, greenChanFinal);
     cv::Mat green = greenChanFinal[greenOrAxis]; 
 
-    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, true, true);
+    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, demo, demo);
 
     if (!presumedROI.empty())
     {   
@@ -92,13 +162,13 @@ int main()
         // we use the largest rectangle as base  
         cv::Mat corrected = cv::Mat::zeros(imageToProcess.cols, imageToProcess.rows, CV_32F); 
         auto plateRectangle = processor.getPlateRectangle();
-        auto destinationPoints = std::vector<cv::Point>();
+        auto destinationPoints = std::vector<cv::Point2f>();
         if (auto plate = plateRectangle.lock())
         {
-            cv::Point topLeft(plate->tl());
-            cv::Point botLeft(plate->tl().x, plate->br().y);
-            cv::Point botRight(plate->br());
-            cv::Point topRight(cv::Point(plate->tl().x + plate->width, plate->tl().y));
+            cv::Point2f topLeft(cv::Point2f(plate->tl()));
+            cv::Point2f botLeft(cv::Point2f(static_cast<float>(plate->tl().x), static_cast<float>(plate->br().y)));
+            cv::Point2f botRight(cv::Point2f(plate->br()));
+            cv::Point2f topRight(cv::Point2f(static_cast<float>(plate->tl().x + plate->width), static_cast<float>(plate->tl().y)));
             destinationPoints.emplace_back(topLeft);
             destinationPoints.emplace_back(topRight);
             destinationPoints.emplace_back(botRight);
@@ -111,8 +181,8 @@ int main()
             cv::warpPerspective(imageToProcess, corrected, matrix, imageToProcess.size());
         }
  
-
-        if (demo) imshow("Points", corrected);
+        demo = true;
+        if (demo) imshow("Corrected", corrected);
         if (demo) waitKey(0);
 
         /*
