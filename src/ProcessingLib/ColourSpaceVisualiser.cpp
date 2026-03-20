@@ -40,7 +40,7 @@ void PreProcessor::ColourSpaceVisualiser::updateHSVChannelsWithProcessed(cv::Mat
 
 void PreProcessor::ColourSpaceVisualiser::displayHSVChannels()
 {
-    if (!this->in_image.empty())
+    if (!this->imageOfLego.empty())
     {
         cv::namedWindow("Hue");
         cv::namedWindow("Saturation");
@@ -72,7 +72,7 @@ void PreProcessor::ColourSpaceVisualiser::displayHSVChannels()
 
 void PreProcessor::ColourSpaceVisualiser::displayLABChannels()
 {
-    if (!this->in_image.empty())
+    if (!this->imageOfLego.empty())
     {
         cv::namedWindow("Lumosity");
         cv::namedWindow("Axis");
@@ -104,7 +104,7 @@ void PreProcessor::ColourSpaceVisualiser::displayLABChannels()
 
 void PreProcessor::ColourSpaceVisualiser::displayLUVChannels()
 {
-    if (!this->in_image.empty())
+    if (!this->imageOfLego.empty())
     {
         cv::namedWindow("Lumosity2");
         cv::namedWindow("U_Channel");
@@ -134,7 +134,7 @@ void PreProcessor::ColourSpaceVisualiser::displayLUVChannels()
 
 void PreProcessor::ColourSpaceVisualiser::displayRGBChannels()
 {
-    if (!this->in_image.empty())
+    if (!this->imageOfLego.empty())
     {
         cv::namedWindow("Red");
         cv::namedWindow("Green");
@@ -165,7 +165,7 @@ void PreProcessor::ColourSpaceVisualiser::displayRGBChannels()
 // Displays copy of image reference resized 
 void PreProcessor::ColourSpaceVisualiser::display(cv::Mat& image, const char* displayName, int pixels)
 {
-    if (!this->in_image.empty())
+    if (!this->imageOfLego.empty())
     {
         cv::namedWindow(displayName);
         // Create an empty Mat object for the resized image

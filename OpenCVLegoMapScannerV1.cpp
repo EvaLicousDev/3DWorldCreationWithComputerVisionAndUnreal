@@ -18,51 +18,6 @@ using namespace PreProcessor;
 
 int main()
 {
-    // TAKE LAB CHANNEL AND ITTERATIVELY FIND THRESHOLD until large white rectangle is found
-    // From that rectangle we section the image upwards, taking only the width of the white rectangle and moving it up into the colour example space
-        // Now we use the BlueYellow channel (because the colour order is based on the *typical order of the B channels values from Dark to light)
-        // Iterating over the BlueYellow channel we go form 0-256 until we find a rectangle-ish formation
-            // If the formation is square blue and purple were picked up at the same time (Axis channel will confirm which is which)
-            // If the formation is rectengular we know we found the first of the two 
-                // We then record the lower bound for the first colour (purple) and create a mask for it
-                // This mask is then checked every step in a central position until the value of a small selection of pixls are 0 again
-                // Then we record the upper bound for that colour
-            // As we increase the pixel value upper and lower bounds we repeat this until we have 8 colours thresholded in A & B 
-
-    //SUGGESTED ALG
-    /*
-     *Pre alg: 
-     * 1. Get 5-10 example images of all colours
-     * 2. Calculate histograms of isolated colour bricks
-     *
-     *Main:
-     * 1. Find square and apply transform
-     * 2. Use B/W bounderies to find threshold area of colours
-     *      a. create areas of interest through finding widest bounding box of 4 sided shape
-     * 3. Create mask to just use square
-     *      a. reduce BGR colour space to 32-64 colours
-     *      b. blur image heavily with k-means based on pixle transform and resize
-     *      c. use red channel to isolate high green values and create a mask for the background
-     *          i. create threshold mask by setting all pixles to either 0 or 255 if value < 25
-     *      d. transform image to LAB
-     *      e. use histogram back projection to threshold all colours
-     *          i. for every colour's bounding box 
-     *              1. use A & B channels to calculate likelyhood mask
-     *              2. combine likelyhood masks for all colours for both channels
-     *      f. Filter through bounding boxes of appropriate size > than min num pixls
-     *          i. apply colour lable 1-8
-     *      g. return coordinates & shapes of results
-     */
-
-    //Blue Yellow Red Purple LightGreen
-
-    /*
-     * Colour order at top of board:
-     *
-     * Purple
-     * DarkBlue
-     */
-
     std::cout << "Starting Preprocessing" << std::endl;
     //Example images
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
@@ -96,7 +51,7 @@ int main()
     //cv::namedWindow("Image to process NO BLUR");
 
     //---------------------------------------------------------
-    bool demo = true; 
+    bool demo = false; 
     //---------------------------------------------------------
 
     cv::Mat imageToProcess = cv::imread(filepath, cv::ImreadModes::IMREAD_COLOR_BGR); 
@@ -153,98 +108,98 @@ int main()
     cv::split(noLowRedGreen, greenChanFinal);
     cv::Mat green = greenChanFinal[greenOrAxis]; 
 
-    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, demo, demo);
+    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask);
+    auto plateRectangle = processor.getPlateRectangle();
+    auto plate = plateRectangle.lock();
 
-    if (!presumedROI.empty())
+    if (!presumedROI.empty() && plate != nullptr)
     {   
         // apply transform now that we know corners of plate
         // we first need the matrix
-        // we use the largest rectangle as base  
+        // we use the largest volium rectangle as base  
         cv::Mat corrected = cv::Mat::zeros(imageToProcess.cols, imageToProcess.rows, CV_32F); 
-        auto plateRectangle = processor.getPlateRectangle();
         auto destinationPoints = std::vector<cv::Point2f>();
-        if (auto plate = plateRectangle.lock())
-        {
-            cv::Point2f topLeft(cv::Point2f(plate->tl()));
-            cv::Point2f botLeft(cv::Point2f(static_cast<float>(plate->tl().x), static_cast<float>(plate->br().y)));
-            cv::Point2f botRight(cv::Point2f(plate->br()));
-            cv::Point2f topRight(cv::Point2f(static_cast<float>(plate->tl().x + plate->width), static_cast<float>(plate->tl().y)));
-            destinationPoints.emplace_back(topLeft);
-            destinationPoints.emplace_back(topRight);
-            destinationPoints.emplace_back(botRight);
-            destinationPoints.emplace_back(botLeft);
-        }
+        cv::Point2f topLeft(cv::Point2f(plate->tl()));
+        cv::Point2f botLeft(cv::Point2f(static_cast<float>(plate->tl().x), static_cast<float>(plate->br().y)));
+        cv::Point2f botRight(cv::Point2f(plate->br()));
+        cv::Point2f topRight(cv::Point2f(static_cast<float>(plate->tl().x + plate->width), static_cast<float>(plate->tl().y)));
+        destinationPoints.emplace_back(topLeft);
+        destinationPoints.emplace_back(topRight);
+        destinationPoints.emplace_back(botRight);
+        destinationPoints.emplace_back(botLeft);
 
         if (!destinationPoints.empty())
         {
             auto matrix = cv::getPerspectiveTransform(presumedROI, destinationPoints);
             cv::warpPerspective(imageToProcess, corrected, matrix, imageToProcess.size());
         }
- 
-        demo = true;
-        if (demo) imshow("Corrected", corrected);
+
+        // Create two images for further processing
+        // 1 for the lego plate, 1 for the row above the plate  
+        cv::Mat legoPlate = corrected(*plate);
+        auto thresholdingROI = cv::Rect(plate->tl().x, 0, plate->width, plate->tl().y);
+        cv::Mat exampleBricks = corrected(thresholdingROI);
+
+        processor.setImageOfLego(legoPlate);
+        processor.setImageOfBricks(exampleBricks);
+
+        if (demo) cv::imshow("Corrected - should be \'straight\' lego plate for better coordinates.", legoPlate);
+        if (demo) cv::imshow("Bricks above board", exampleBricks);
         if (demo) waitKey(0);
 
-        /*
-        cv::Mat  unprocessedROI = imageToProcess(plate);
-        auto thresholdingROI = cv::Rect(plate.tl().x, 0, plate.width, plate.tl().y);
-        cv::Mat exampleBricks = imageToProcess(thresholdingROI);
+        //get the location of our example bricks for backprojection and template matching
+        auto bricks = processor.findBrickLocations(exampleBricks, demo); 
 
+        demo = true;
         if (demo)
         {
-            imshow("Thresh area", exampleBricks);
-            waitKey(0);
-        }
-
-
-        mserOutMask = processor.getMSERMask(exampleBricks);
-        processor.getContourData(mserOutMask, true);
-        auto rectanglesPtr2 = processor.getRectangles();
-
-        //find bricks
-        auto bricks = std::vector<cv::Rect>();
-        if (rectanglesPtr2 != nullptr && rectanglesPtr2->size() != 0)
-        {
-            for (auto rectangleInstance : *rectanglesPtr2)
+            for (const auto brick : bricks)
             {
-                bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width * 2);
-                if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
-                {
-                    bricks.emplace_back(rectangleInstance);
-                }
+                cv::imshow("Brick", exampleBricks(brick));
+                cv::waitKey(0);
             }
         }
 
-        mserOutMask = processor.getMSERMask(unprocessedROI);
-        cv::medianBlur(mserOutMask, mserOutMask, 3);
-        processor.getContourData(mserOutMask, true);
+        //TO DO: check if all bricks present
 
-        if (demo)
-        {
-            imshow("MSER contours", processor.getDrawnContours());
-            imshow("Feature detection", mserOutMask);
-            cv::waitKey(0);
-        }
+        // get Features with MSER ( open CV algorithm that does iterative thresholding and looks for regions that stay together )
+        demo = true; 
+        mserOutMask = processor.getMSERMask(legoPlate, true);
+        processor.getContourData(mserOutMask, false);
+        cv::Mat contoursMSER = processor.applySobel(mserOutMask, 3); 
+        cv::threshold(contoursMSER, contoursMSER, 0, 255, THRESH_BINARY_INV); 
+
+        // convert image to LAB colour space to prepare height map generation and & colour detection
+        cv::Mat legoLAB;
+        cv::Mat labChannels[3]; 
+        cv::cvtColor(legoPlate, legoLAB, COLOR_BGR2Lab); 
+        cv::split(legoLAB, labChannels);
+        cv::Mat blueYellow = labChannels[redOrBlueYellow]; 
+        cv::Mat map = processor.createMapWithContoursAndLABchannel(blueYellow, contoursMSER);
+
+        if (demo) imshow("MAP", map);
+        if (demo) imshow("Feature detection", mserOutMask);
+        if (demo) cv::waitKey(0);
 
         bool showProjection = true;
         for (auto brick : bricks)
         {
             auto brickMat = exampleBricks(brick);
-            auto pixels = processor.backprojectHistogram(unprocessedROI, brickMat, 180);
+            auto pixels = processor.backprojectHistogram(legoPlate, brickMat, 180);
             cv::threshold(pixels, pixels, 200, 255, THRESH_BINARY);
             cv::Mat showPixls;
-            unprocessedROI.copyTo(showPixls, pixels);
+            legoPlate.copyTo(showPixls, pixels);
 
             if (showProjection)
             {
-                auto detector = AbsColourDistance::ColourDetector(); 
-                auto brickColour = detector.getBrickApproximation(brickMat); 
+                auto detector = AbsColourDistance::ColourDetector();
+                auto brickColour = detector.getBrickApproximation(brickMat);
 
                 auto name = std::string(getBrickColour(brickColour));
                 int margin = 5;
-                int base = 0; 
-                cv::Size textSize = cv::getTextSize(name, cv::FONT_HERSHEY_COMPLEX, 2, 2, &base); 
-                auto text = cv::Point(showPixls.cols-textSize.width-margin, textSize.height + margin);  
+                int base = 0;
+                cv::Size textSize = cv::getTextSize(name, cv::FONT_HERSHEY_COMPLEX, 2, 2, &base);
+                auto text = cv::Point(showPixls.cols - textSize.width - margin, textSize.height + margin);
                 cv::putText(showPixls, name, text, cv::FONT_HERSHEY_COMPLEX, 2, CV_RGB(255, 50, 100), 2);
                 cv::imshow("Brick", brickMat);
                 cv::imshow("Assumed area", showPixls);
@@ -252,43 +207,12 @@ int main()
             }
 
             cv::Mat res;
-            cv::matchTemplate(unprocessedROI, brickMat, res, TemplateMatchModes::TM_SQDIFF_NORMED);
-            //cv::threshold(res, res, 0, 100, THRESH_MASK);
+            cv::matchTemplate(legoPlate, brickMat, res, TemplateMatchModes::TM_SQDIFF_NORMED);
             imshow("matched", res);
             cv::waitKey(2);
-            }
-            */
-        
-        
+        }
     }
 
-    // for (auto brick : bricks)
-    // {
-    //     auto brickMat = exampleBricksBlurred(brick);
-    //     //get square in middle of brick
-    //     auto newX = brick.width / 4; 
-    //     auto newY = (brick.height / 8)*3;
-    //     auto sample = cv::Rect(newX, newY, (brick.width / 2), (brick.height / 4));
-    //     cv::Mat smallSample = brickMat(sample); 
-    //
-    //     cv::Mat showPixles; 
-    //     cv::Mat colourHistorgram;
-    //     cv::Mat projection;
-    //
-    //     const float hranges[2] = {0.0, 255.0};
-    //     const float* ranges[3] = {hranges, hranges, hranges};
-    //     int chan[3] = {0,1,2};
-    //     int histSz = 255; 
-    //     cv::calcHist(&smallSample, 1, chan, cv::Mat(), colourHistorgram, 2, &histSz, ranges); 
-    //     cv::normalize(colourHistorgram, colourHistorgram, 0, 255, NORM_MINMAX);
-    //     cv::calcBackProject(&legoROI, 1, chan, colourHistorgram, projection, ranges); 
-    //     cv::threshold(projection, projection, 100, 255, THRESH_BINARY);
-    //
-    //     legoROI.copyTo(showPixles, projection);
-    //     imshow("Colour Hist projection", showPixles); 
-    //     imshow("Sample", smallSample);
-    //     cv::waitKey(0);
-    // }
     cv::waitKey(0);
 
     cout << "----------------------------End--------------------------------" << endl;

@@ -14,6 +14,85 @@
 #include "Histogram/ColourHistogram.h"
 #include "Histogram/HistorgramGraphCreator.h"
 
+void PreProcessor::ImageProcessor::setWhiteBrick(cv::Mat& image)
+{
+    whiteBrick = std::make_shared<cv::Mat>(image);
+}
+void PreProcessor::ImageProcessor::setImageOfLego(cv::Mat& image)
+{
+    imageOfLego = std::make_shared<cv::Mat>(image); 
+}
+
+void PreProcessor::ImageProcessor::setImageOfBricks(cv::Mat& image)
+{
+    //we crop the bricks to just use the middle section of the image
+    //auto sampleY = (image.cols / 3);
+    //cv::Rect crop(0, sampleY, image.cols-1, image.rows-1);
+    //cv::Mat cropped = image(crop);
+    //imageOfBricks = std::make_shared<cv::Mat>(cropped);
+    imageOfBricks = std::make_shared<cv::Mat>(image);
+}
+
+std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& brickArea, bool showResult /* = false */)
+{
+    auto demo = showResult; 
+    cv::Mat brickChannels[3];
+    cv::split(brickArea, brickChannels);
+    cv::Mat brickMaskReddishColours;
+    cv::Mat brickMaskBluishColours;
+    threshold(brickChannels[redOrBlueYellow], brickMaskReddishColours, 50, 255, cv::THRESH_BINARY);
+    threshold(brickChannels[blueOrLuminance], brickMaskBluishColours, 150, 255, cv::THRESH_BINARY);
+    if (demo) cv::imshow("Brick mask Reds", brickMaskReddishColours);
+    if (demo) cv::imshow("Brick mask Blues", brickMaskBluishColours);
+    if (demo) cv::waitKey(0);
+
+    this->getContourData(brickMaskReddishColours, false);
+    auto rectanglesPtrReds = this->getRectangles();
+
+    this->getContourData(brickMaskBluishColours, false);
+    auto rectanglesPtrBlues = this->getRectangles();
+
+    auto bricks = std::vector<cv::Rect>();
+    std::shared_ptr<std::vector<cv::Rect>> presumedBricks[2];
+    presumedBricks[0] = rectanglesPtrReds;
+    presumedBricks[1] = rectanglesPtrBlues;
+
+    for (auto rect : presumedBricks)
+    {
+        if (rect != nullptr && rect->size() != 0)
+        {
+            for (auto rectangleInstance : *rect)
+            {
+                bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width * 1.9);
+                if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
+                {
+                    //shrink the rectangle to exclude unwanted pixls
+                    auto smallerRectTLX = rectangleInstance.tl().x + (rectangleInstance.width *0.8);
+                    auto smallerRectTLY = rectangleInstance.tl().y + (rectangleInstance.height *0.8);
+                    auto smallerRectBRX = rectangleInstance.br().x - (rectangleInstance.width *0.8);
+                    auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height * 0.8 );
+                    cv::Rect smallerRect(cv::Point(smallerRectTLX, smallerRectTLY), cv::Point(smallerRectBRX, smallerRectBRY)); 
+
+                    bool dontPlace = false;
+                    bool isInBricks = false;
+                    for (auto brickRectangle : bricks)
+                    {
+                        // We check if the rectangles overlap 
+                        // for synatx refer to https://putuyuwono.wordpress.com/2015/06/26/intersection-and-union-two-rectangles-opencv/
+                        isInBricks = (smallerRect & brickRectangle).area() > 0;
+                        if (isInBricks) dontPlace = true;
+                    }
+                    if (!dontPlace)
+                    {
+                        bricks.emplace_back(smallerRect);
+                    }
+                }
+            }
+        }
+    }
+    return bricks; 
+}
+
 void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool drawContours)
 {
     std::vector<std::vector<cv::Point>> contours;
@@ -22,15 +101,15 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
     std::vector<cv::Rect> boundRect(contours.size());
     std::vector<cv::Rect> filteredRect(contours.size());
 
+    for (size_t i = 0; i < contours.size(); i++)
+    {
+        boundRect[i] = boundingRect(contours[i]);
+    }
+
     if (drawContours)
     {
         drawenContours.release();
         drawenContours = cv::Mat(allEdgesAdded.cols, allEdgesAdded.rows, CV_8UC1);
-        for (size_t i = 0; i < contours.size(); i++)
-        {
-            boundRect[i] = boundingRect(contours[i]);
-            //approxPolyDP(contours[i], filteredContours[i], 4, true);
-        }
         cv::drawContours(drawenContours, contours, -1, CV_RGB(255,255,255)); 
     }
 
@@ -105,11 +184,13 @@ cv::Rect PreProcessor::ImageProcessor::findSquareIsh(const std::vector<cv::Point
     return cv::Rect(0,0,0,0); 
 }
 
+
+
 cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool showAreas /* = false */)
 {
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
-    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 9, ((unblurredImage.cols*unblurredImage.rows)),0.1 );
+    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 9, ((unblurredImage.cols*unblurredImage.rows)/2),0.25,0.01, 500, 1.01, 0.003, 9);
 
     std::vector<std::vector<cv::Point> > mserContours;
     std::vector<cv::Rect> mserRegions;
@@ -121,63 +202,55 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool s
         for (cv::Point point : pointVector) {
             mserMask.at<uchar>(point.y, point.x) = colourValue;
         }
-        colourValue += showAreas ? 5 : 0;
+        colourValue += showAreas ? 0 : 0;
     }
 
     this->mserMask = std::make_shared<cv::Mat>(mserMask); 
 
-    if (showAreas) cv::imshow("Mazimally stable extremal regions - greyscale (up to 25 regions shown)", mserMask);
+    if (showAreas) cv::imshow("Maximally stable extremal regions - greyscale (up to 25 regions shown)", mserMask);
     if (showAreas) cv::waitKey(0);
 
     return mserMask; 
 }
 
-cv::Mat PreProcessor::ImageProcessor::addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser)
+// custom way of adding the contours and colour channel to create a map 
+cv::Mat PreProcessor::ImageProcessor::createMapWithContoursAndLABchannel(const cv::Mat& labChannel, const cv::Mat& mser)
 {
-    if (green.rows != mser.rows || green.cols != mser.cols)
+    if (labChannel.rows != mser.rows || labChannel.cols != mser.cols)
     {
-        Errors::ErrorOutput(Errors::IMAGEs_NOT_EQUAL_SIZE, "Green mask and mser mask are expected dto be qual size but are not! Please investigate."); 
+        Errors::ErrorOutput(Errors::IMAGEs_NOT_EQUAL_SIZE, "Input for this funciton has to have equal rows and columns but didn't."); 
         return cv::Mat(); 
     }
 
-    cv::Mat outMask = cv::Mat::zeros(green.rows, green.cols, CV_8UC1); 
+    cv::Mat outMask = cv::Mat::zeros(labChannel.rows, labChannel.cols, CV_8UC1); 
 
-    //custom add function
-    auto rows = green.rows;
-    auto cols = green.channels() * green.cols;
+    auto rows = labChannel.rows;
+    auto cols = labChannel.channels() * labChannel.cols;
 
-    auto bothContinuous = green.isContinuous() && mser.isContinuous(); 
+    auto bothContinuous = labChannel.isContinuous() && mser.isContinuous(); 
     if (bothContinuous)
     {
         cols = cols * rows;
         rows = 1;
     }
 
-    //loop over all pixels in the image and reduce colour value on each cannel
+    //loop over all pixels in the images
     for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
     {
-        auto greenPx = green.ptr<uchar>(rowIndex);
+        auto labPx = labChannel.ptr<uchar>(rowIndex);
         auto mserPx = mser.ptr<uchar>(rowIndex);
         auto outPx = outMask.ptr<uchar>(rowIndex); 
 
         for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
         {
-            // For each channel we apply a reduction based on how many different colours we want to identify
-            // If we want to identify 32 colours, we divide by 8, for 16 -> 16 ect...
-            // We add a small factor to get definitives for any values on the edge between two colours
-            if (greenPx[columnIndex]<255)
+            //if the pixel is black in the mser Mask we keep it black, otherwise we add the LAB channel Value
+            if (mserPx[columnIndex] != 0)
             {
-                //favour black pixles of green mask, and make them black in output
-                outPx[columnIndex] = 0; 
+                outPx[columnIndex] = labPx[columnIndex]; 
             } 
-            else if (mserPx[columnIndex] < 255) //green is white but mser is black
-            {
-                //set a light grey value for non
-                outPx[columnIndex] = 150;
-            }
             else
             {
-                outPx[columnIndex] = 255;
+                outPx[columnIndex] = 0;
             }
         }
     }
@@ -438,9 +511,9 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
         cv::rectangle(orig, largest, CV_RGB(150, 200, 0), 3);
     }
 
-    auto perimiter = cv::arcLength(contours[maxContourID], true);
+    auto circumfrance = cv::arcLength(contours[maxContourID], true);
     std::vector<cv::Point2f> largestCorners;
-    cv::approxPolyDP(contours[maxContourID], largestCorners, perimiter * 0.1, true); //epsilon is generous
+    cv::approxPolyDP(contours[maxContourID], largestCorners, circumfrance * 0.1, true); //epsilon is generous
 
     if (largestCorners.size() <= 4)
     {
@@ -641,7 +714,7 @@ cv::Rect PreProcessor::ImageProcessor::getPlateWithGreenChannel(cv::Mat unproces
         cv::waitKey(0);
     }
 
-    this->getContourData(edges, true);
+    this->getContourData(edges, false);
     auto contourPoints = this->getContourPoints();
     auto largest = this->findLargestVoliumSquareContour(*contourPoints);
 

@@ -25,5 +25,3 @@ except KeyboardInterrupt:
     print("Finishing up...")
 finally:
     print("Stopping Camera Application")
-
-

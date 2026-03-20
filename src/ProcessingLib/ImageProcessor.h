@@ -58,9 +58,9 @@ namespace PreProcessor
 
     public:
         ImageProcessor(const cv::Mat& loadedImage)
-            : in_image(std::make_shared<cv::Mat>(loadedImage))
+            : imageOfLego(std::make_shared<cv::Mat>(loadedImage))
         {
-            if (!in_image->empty())
+            if (!imageOfLego->empty())
             {
              //   visualiserInstance = std::make_unique<ColourSpaceVisualiser>(in_image); 
             }
@@ -74,6 +74,7 @@ namespace PreProcessor
         std::weak_ptr<cv::Rect> getPlateRectangle() { return m_biggestRect; }
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
         cv::Rect findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
+        std::vector<cv::Rect> findBrickLocations(cv::Mat& brickArea, bool showResult = false); 
 
         cv::Point2f findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
@@ -113,16 +114,21 @@ namespace PreProcessor
         int     getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const; 
 
         //debug functions for development
-        cv::Mat& getMainImage() { return *in_image; }
+        cv::Mat& getMainImage() { return *imageOfLego; }
 
         void    debugInfo(cv::Mat& image);
         cv::Mat getMSERMask(cv::Mat unblurredImage, bool showAreas = false);
-        cv::Mat addGreenAndMSER(const cv::Mat& green, const cv::Mat& mser);
+        cv::Mat createMapWithContoursAndLABchannel(const cv::Mat& green, const cv::Mat& mser);
 
         cv::Mat                                               getDrawnContours() { return drawenContours; }
         std::shared_ptr<cv::Mat>                              getLegoPXMask()    { return legoPXMask;  }
         std::shared_ptr<std::vector<cv::Rect>>                getRectangles()    { return m_boundRect; }
         std::shared_ptr<std::vector<std::vector<cv::Point>>>  getContourPoints() { return m_contours_poly;  }
+
+        void setImageOfLego(cv::Mat& image); 
+        void setImageOfBricks(cv::Mat& image);
+        void setWhiteBrick(cv::Mat& image);
+        std::shared_ptr<cv::Mat> getBrickSample() { return imageOfBricks; }
 
     private:
         bool isWithinTollerance(cv::Rect& output); 
@@ -131,7 +137,9 @@ namespace PreProcessor
         int leftWhiteMarkerTL_X = -1; 
         int rightWhiteMarkerTR_X = -1; 
 
-        std::shared_ptr<cv::Mat> in_image = nullptr; 
+        std::shared_ptr<cv::Mat> imageOfLego = nullptr; 
+        std::shared_ptr<cv::Mat> imageOfBricks = nullptr;
+        std::shared_ptr<cv::Mat> whiteBrick = nullptr;
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
 
         std::shared_ptr<cv::Mat> legoPXMask = nullptr;

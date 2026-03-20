@@ -115,7 +115,6 @@ class Cam_Controls:
                             }
         self.controls = [controls_daylight, controls_twilight, controls_super_low_light, controls_bright_light]
         
-
 #------------------------------------------------------------------------------------
 #--------------------------------HDR image creator-----------------------------------
 #------------------------------------------------------------------------------------
@@ -187,7 +186,6 @@ class HDR_Img_Creator:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(image_name={self.image_name}, meta_data={self.metadata_name})"
         
-  
 #------------------------------------------------------------------------------------
 #--------------------------------Pi Camera Class--------------------------------------
 #------------------------------------------------------------------------------------
@@ -196,8 +194,8 @@ class HDR_Img_Creator:
 class HDR_Img_Camera:
     __name__ = "HDR_Camera_Class"
         
-    picam = Picamera2()
-    configuration = picam.create_video_configuration(main={"size":(1920,1080)})
+    camera_instance = Picamera2()
+    configuration = camera_instance.create_video_configuration(main={"size":(1920,1080)})
     metadata = None
     controls = None
     merge_mode = None
@@ -227,12 +225,12 @@ class HDR_Img_Camera:
     # and then creates an instance of the Cam_controls class
     def startCam(self):
         # start and show camera so view can be adjusted
-        self.picam.start(show_preview=True)
-        self.picam.title_fields = ["ExposureTime", "AnalogueGain"]
+        self.camera_instance.start(show_preview=True)
+        self.camera_instance.title_fields = ["ExposureTime", "AnalogueGain"]
         
         #set up remaining data
         time.sleep(2) #give the camera time to auto adjust to light conditions
-        self.metadata = self.picam.capture_metadata()
+        self.metadata = self.camera_instance.capture_metadata()
         time.sleep(1)
         self.normal_exposure = self.metadata["ExposureTime"]
         self.normal_analogue_gain = self.metadata["AnalogueGain"] * self.metadata["DigitalGain"]
@@ -242,8 +240,8 @@ class HDR_Img_Camera:
         
         #Wait for user to set up camera with preview
         input("Pi camera set up controls and capture modes. Press enter to continue.")
-        self.picam.stop_preview()
-        self.picam.stop()
+        self.camera_instance.stop_preview()
+        self.camera_instance.stop()
         
     #------------------------------------------------------------------------------------
     def capture_hdr_set(self):
@@ -257,7 +255,7 @@ class HDR_Img_Camera:
         # hardware of the sensor & lense can adjust
         modeIndex = 0
         for control_set in self.controls.get_controls():
-            self.picam.set_controls(control_set)
+            self.camera_instance.set_controls(control_set)
             
             shortest_exposure = int(self.normal_exposure / FRAM_VALUE_ADJUSTMENT_RATIO)
             short_exposure    = int(shortest_exposure*2)
@@ -268,54 +266,54 @@ class HDR_Img_Camera:
             
             #normal
             frameNumber = 1 
-            self.picam.start()
-            normal = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            normal = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             #shortest
             frameNumber = 2
-            self.picam.set_controls({"ExposureTime" : shortest_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : shortest_exposure})
             time.sleep(0.5)
-            self.picam.start()
-            shortest = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            shortest = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             #short 
             frameNumber = 3
-            self.picam.set_controls({"ExposureTime" : short_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : short_exposure})
             time.sleep(0.5)
-            self.picam.start()
-            short = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            short = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             #long
             frameNumber = 4
-            self.picam.set_controls({"ExposureTime" : long_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : long_exposure})
             time.sleep(0.5)
-            self.picam.start()
-            long = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            long = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             #longer
             frameNumber = 5
-            self.picam.set_controls({"ExposureTime" : longer_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : longer_exposure})
             time.sleep(0.5)
-            self.picam.start()
-            longer = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            longer = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             #longest
             frameNumber = 6
-            self.picam.set_controls({"ExposureTime" : longest_exposure, "AnalogueGain": (self.normal_analogue_gain/2)})
+            self.camera_instance.set_controls({"ExposureTime" : longest_exposure, "AnalogueGain": (self.normal_analogue_gain/2)})
             time.sleep(0.5)
-            self.picam.start()
-            longest = self.picam.capture_array()
-            self.picam.stop()
+            self.camera_instance.start()
+            longest = self.camera_instance.capture_array()
+            self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
             filename = OUTPUT_DIR / f"hdr_{timestamp}.jpg"
@@ -348,4 +346,3 @@ class HDR_Img_Camera:
     
     def __repr__(self) -> str:
         return f"{type(self).__name__}(normal_expoure={self.normal_expoure}, normal_analogue_gain={self.normal_analogue_gain})"
-

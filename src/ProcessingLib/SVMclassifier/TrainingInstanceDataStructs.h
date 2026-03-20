@@ -45,10 +45,10 @@ namespace brickColourSVM
             histogramLAB_Bchannel = std::make_shared<Histogram::SingleChannelHistogram>(bChannelHist);
         }
 
-        bool isValid() { return histogramLAB_Achannel != nullptr && histogramLAB_Bchannel != nullptr && bgrMeanValues != nullptr; }
+        bool isValid() { return histogramLAB_Achannel != nullptr && histogramLAB_Bchannel != nullptr && bgrMeanValues != nullptr;}
 
         std::string imagePath = "";
-        BrickCV::BrickColour brickColour = BrickCV::BrickColour::BLACK; 
+        BrickCV::BrickColour brickColour = BrickCV::BrickColour::BLACK;
         std::shared_ptr<cv::Scalar> bgrMeanValues = nullptr;
         std::shared_ptr<Histogram::SingleChannelHistogram> histogramLAB_Achannel = nullptr; 
         std::shared_ptr<Histogram::SingleChannelHistogram> histogramLAB_Bchannel = nullptr;
