@@ -13,7 +13,8 @@ namespace Errors
         IMAGE_PATH_EMPTY = 5,
         IMAGEs_NOT_EQUAL_SIZE = 6, 
         X_COORDINATE_MISMATCH = 7,
-        FUNCTION_CALLED_TOO_SOON = 8
+        FUNCTION_CALLED_TOO_SOON = 8, 
+        EUCLIDIAN_DISTANCE_MISMATCH = 9
     };
 
     static const constexpr char* getErrorMessage(const BrickCVErrors& error)
@@ -21,34 +22,37 @@ namespace Errors
         switch (error)
         {
         case UNIDENTIFIED:
-            return "[ERROR] [unspecified issue occured]";
+            return "[ERROR] \t [unspecified issue occured] \n";
             break;
         case NOT_SINGLE_CHANNEL_IMAGE:
-            return "[ERROR] [This function requires the cv::Mat to only have one channel]";
+            return "[ERROR] \t [This function requires the cv::Mat to only have one channel] \n";
             break;
         case COULD_NOT_ALLOCATE:
-            return "[ERROR] [Memory for object wasn't allocated in operation]";
+            return "[ERROR] \t [Memory for object wasn't allocated in operation] \n";
             break;
         case NULL_PTR:
-            return "[WARNING] [Nullptr check prevented crash]";
+            return "[WARNING] \t [Nullptr check prevented crash] \n";
             break;
         case MEMORY_LEAK_WARNING:
-            return "[IMPORTANT ERROR] [There was an issue with logic effecting memory de-allocation]";
+            return "[IMPORTANT ERROR] \t [There was an issue with logic effecting memory de-allocation] \n";
             break;
         case IMAGE_PATH_EMPTY:
-            return "[IMPORTANT ERROR] [An image path was evaluated to an empty string]";
+            return "[IMPORTANT ERROR] \t [An image path was evaluated to an empty string] \n";
             break;
         case IMAGEs_NOT_EQUAL_SIZE:
-            return "[IMPORTANT ERROR] [Function requires images of equal size]";
+            return "[IMPORTANT ERROR] \t [Function requires images of equal size] \n";
             break;
         case X_COORDINATE_MISMATCH:
-            return "[CRITICAL ERROR] [Expected x coordinated diviated too strongly from provided]";
+            return "[CRITICAL ERROR] \t [Expected x coordinated diviated too strongly from provided] \n";
             break;
         case FUNCTION_CALLED_TOO_SOON:
-            return "[CRITICAL ERROR] [This function failed a basic check it needs to pass in order to return a valid result, likely due to being called too soon. Please breakpoint and check.]";
+            return "[CRITICAL ERROR] \t [This function failed a basic check it needs to pass in order to return a valid result, likely due to being called too soon. Please breakpoint and check] \n";
+            break;
+        case EUCLIDIAN_DISTANCE_MISMATCH:
+            return "[WARNING] \t [HTML shades don't match expected colour] \n \t \t Suggestion: Breakpoint & check number of detected colours and current shade.\n";
             break;
         default:
-            return "sth went really wrong if you see this.";
+            return "------------------------------------------------------------------- \n [UNKNOWN ERROR] \n \t I can't belive this. It done goofed!! How could this happen?? \n The anguish! \n Anyway, something went really wrong if you see this. Better check what happened... \n ------------------------------------------------------------------- \n";
         }
     }
 }

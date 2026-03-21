@@ -36,6 +36,9 @@ void PreProcessor::ImageProcessor::setImageOfBricks(cv::Mat& image)
 std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& brickArea, bool showResult /* = false */)
 {
     auto demo = showResult; 
+    cv::Mat brickAreaCopy; 
+    if (showResult) brickArea.copyTo(brickAreaCopy); 
+
     cv::Mat brickChannels[3];
     cv::split(brickArea, brickChannels);
     cv::Mat brickMaskReddishColours;
@@ -66,12 +69,16 @@ std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& 
                 bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width * 1.9);
                 if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
                 {
+
                     //shrink the rectangle to exclude unwanted pixls
                     auto smallerRectTLX = rectangleInstance.tl().x + (rectangleInstance.width *0.8);
                     auto smallerRectTLY = rectangleInstance.tl().y + (rectangleInstance.height *0.8);
                     auto smallerRectBRX = rectangleInstance.br().x - (rectangleInstance.width *0.8);
                     auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height * 0.8 );
                     cv::Rect smallerRect(cv::Point(smallerRectTLX, smallerRectTLY), cv::Point(smallerRectBRX, smallerRectBRY)); 
+
+                    if (showResult) cv::rectangle(brickAreaCopy, rectangleInstance, CV_RGB(255,0,255), 3);
+                    if (showResult) cv::rectangle(brickAreaCopy, smallerRect, CV_RGB(0, 255, 0), 3);
 
                     bool dontPlace = false;
                     bool isInBricks = false;
@@ -86,9 +93,16 @@ std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& 
                     {
                         bricks.emplace_back(smallerRect);
                     }
+                    else if(showResult) cv::rectangle(brickAreaCopy, smallerRect, CV_RGB(255, 0, 0), 3); //should mark white ROI in red
                 }
             }
         }
+    }
+
+    if (showResult)
+    {
+        cv::imshow("Brick area rectangles", brickAreaCopy);
+        cv::waitKey(0); 
     }
     return bricks; 
 }
@@ -97,12 +111,11 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
 {
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(allEdgesAdded, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-    std::vector<std::vector<cv::Point>> filteredContours(contours.size());
     std::vector<cv::Rect> boundRect(contours.size());
-    std::vector<cv::Rect> filteredRect(contours.size());
 
     for (size_t i = 0; i < contours.size(); i++)
     {
+        cv::approxPolyDP(contours[i], contours[i], 4, true);
         boundRect[i] = boundingRect(contours[i]);
     }
 
@@ -114,7 +127,7 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
     }
 
     this->m_boundRect = std::make_shared<std::vector<cv::Rect>>(boundRect);
-    this->m_contours_poly = std::make_shared<std::vector<std::vector<cv::Point>>>(filteredContours);
+    this->m_contours = std::make_shared<std::vector<std::vector<cv::Point>>>(contours);
 }
 
 cv::Rect PreProcessor::ImageProcessor::findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner) {
@@ -202,7 +215,7 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool s
         for (cv::Point point : pointVector) {
             mserMask.at<uchar>(point.y, point.x) = colourValue;
         }
-        colourValue += showAreas ? 0 : 0;
+        colourValue += showAreas ? 5 : 0;
     }
 
     this->mserMask = std::make_shared<cv::Mat>(mserMask); 

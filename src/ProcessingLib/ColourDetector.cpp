@@ -47,18 +47,37 @@ const BrickColour AbsColourDistance::ColourDetector::getBrickApproximation(const
     for (const auto colour : vectorNames)
     {
         auto colourVector = exampleBrickShades[colour];
-        for (const auto shade : colourVector)
+        if (m_brickColourMap == nullptr)
         {
-            auto shadeScalar = getBGRColour(shade);
-            cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, shadeScalar);
+            // If we don't have a brick sample scalar, we use selected default HTML colour shades
+            for (const auto shade : colourVector)
+            {
+                auto shadeScalar = getBGRColour(shade);
+                cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, shadeScalar);
+                cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
+                shadeScalar = cv::mean(rgbToLab);
+
+                double distanceToEachOther = cv::norm(shadeScalar, meanColour);
+                if (distanceToEachOther < distance)
+                {
+                    distance = distanceToEachOther;
+                    bestMatch = colour;
+                }
+            }
+        }
+        else
+        {
+            // If we have a brick sample scalar we use that
+            auto brickShade = m_brickColourMap->at(colour);
+            cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, brickShade);
             cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
-            shadeScalar = cv::mean(rgbToLab);
+            auto shadeScalar = cv::mean(rgbToLab);
 
             double distanceToEachOther = cv::norm(shadeScalar, meanColour);
             if (distanceToEachOther < distance)
             {
-                distance = distanceToEachOther; 
-                bestMatch = colour; 
+                distance = distanceToEachOther;
+                bestMatch = colour;
             }
         }
     }

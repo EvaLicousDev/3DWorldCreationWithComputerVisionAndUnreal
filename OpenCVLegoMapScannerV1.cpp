@@ -52,6 +52,15 @@ int main()
 
     //---------------------------------------------------------
     bool demo = false; 
+    bool resetLog = true; 
+    //---------------------------------------------------------
+    // Error log gets errased
+    if (resetLog)
+    {
+        std::ofstream ofs;
+        ofs.open(Errors::sc_errorOutputFilePath, std::ofstream::out | std::ofstream::trunc);
+        ofs.close();
+    }
     //---------------------------------------------------------
 
     cv::Mat imageToProcess = cv::imread(filepath, cv::ImreadModes::IMREAD_COLOR_BGR); 
@@ -139,6 +148,8 @@ int main()
         cv::Mat legoPlate = corrected(*plate);
         auto thresholdingROI = cv::Rect(plate->tl().x, 0, plate->width, plate->tl().y);
         cv::Mat exampleBricks = corrected(thresholdingROI);
+        cv::Mat labShades;
+        cv::cvtColor(exampleBricks, labShades, COLOR_BGR2Lab);
 
         processor.setImageOfLego(legoPlate);
         processor.setImageOfBricks(exampleBricks);
@@ -147,22 +158,54 @@ int main()
         if (demo) cv::imshow("Bricks above board", exampleBricks);
         if (demo) waitKey(0);
 
+        demo = true;
+
         //get the location of our example bricks for backprojection and template matching
         auto bricks = processor.findBrickLocations(exampleBricks, demo); 
+        std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
+            {
+                return left.tl().x < right.tl().x;
+            });
 
-        demo = true;
+        // Now we set up the colour detector with the scalars for our colours to get a better euclidian distance value
+        auto detector = AbsColourDistance::ColourDetector();
+        std::map<BrickColour, cv::Rect> brickColourMap{};
+        std::map<BrickColour, cv::Scalar> brickScalarMap{};
+        int index = 0; 
+        for (const auto brick : bricks)
+        {
+            auto expectedColour = sc_coloursInUse[index];
+            cv::Mat brickMat = exampleBricks(brick); 
+            auto colourByDistance = detector.getBrickApproximation(brickMat);
+
+            if (expectedColour != colourByDistance)
+            {
+                // This error is here primarely for testing and development
+                // We do not want to fail here if this happens 
+                Errors::ErrorOutput(Errors::EUCLIDIAN_DISTANCE_MISMATCH, "Expected colour", getBrickColour(expectedColour), "matched as", getBrickColour(colourByDistance));
+            }
+
+            //add to maps
+            auto meanColour = cv::mean(exampleBricks(brick));
+            brickScalarMap.emplace(expectedColour,meanColour);
+            brickColourMap.emplace(expectedColour, brick); 
+            index++; 
+        }
+
+        detector.setBrickColourMap(brickScalarMap); 
+
         if (demo)
         {
-            for (const auto brick : bricks)
+            for (const auto [_, scalar] : brickScalarMap)
             {
-                cv::imshow("Brick", exampleBricks(brick));
+                auto av = cv::Mat(100, 100, CV_8UC3, scalar);
+                cv::imshow("Avarage Colour shade", av);
                 cv::waitKey(0);
             }
         }
 
-        //TO DO: check if all bricks present
-
         // get Features with MSER ( open CV algorithm that does iterative thresholding and looks for regions that stay together )
+        // with access to the contributer verion of open CV ximgproc/segmentation.hpp -> Graphbased segmentation would be an intersting alternative here
         demo = true; 
         mserOutMask = processor.getMSERMask(legoPlate, true);
         processor.getContourData(mserOutMask, false);
@@ -192,7 +235,6 @@ int main()
 
             if (showProjection)
             {
-                auto detector = AbsColourDistance::ColourDetector();
                 auto brickColour = detector.getBrickApproximation(brickMat);
 
                 auto name = std::string(getBrickColour(brickColour));

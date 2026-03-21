@@ -5,6 +5,8 @@
 #include "BrickCVEnums/BrickColourEnum.h"
 #include "BrickCVEnums/ChannelType.h"
 
+#include <map>
+
 using namespace BrickCV;
 namespace AbsColourDistance
 {
@@ -12,6 +14,15 @@ namespace AbsColourDistance
     // colour space is RGB888 as camera also uses RGB888
     class ColourDetector
     {
+    public:
+        ColourDetector() = default;
+
+        void setBrickColourMap(std::map<BrickColour, cv::Scalar>& brickMap) { m_brickColourMap = std::make_shared<std::map<BrickColour, cv::Scalar>>(brickMap); };
+        static cv::Mat processChannel(const cv::Mat image, const cv::Mat& example, int& boundry, BrickCV::ChannelType channelType);
+        const BrickColour getBrickApproximation(const cv::Mat& colourSample);
+
+        std::shared_ptr<std::map<BrickCV::BrickColour, cv::Scalar>> m_brickColourMap = nullptr;
+    private:
         //All colours are stored as 24 bit hexadecimal number combination in a 32 bit integer
         const std::vector<uint32_t> purple     = { RGB888::MidnightBlue,   RGB888::Indigo,      RGB888::DarkSlateBlue };
         const std::vector<uint32_t> darkBlue   = { RGB888::DarkBlue,       RGB888::MediumBlue,  RGB888::Navy          };
@@ -38,10 +49,5 @@ namespace AbsColourDistance
             //note we use BGR as native format to open cv, so we swap channel positions for blue and red
             return cv::Scalar(blue, green, red);
         }
-
-    public:
-        ColourDetector() = default;  
-        static cv::Mat processChannel(const cv::Mat image, const cv::Mat& example, int& boundry, BrickCV::ChannelType channelType);
-        const BrickColour getBrickApproximation(const cv::Mat& colourSample); 
     };
 }
