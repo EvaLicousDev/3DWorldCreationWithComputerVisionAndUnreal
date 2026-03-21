@@ -20,6 +20,7 @@ namespace AbsColourDistance
         void setBrickColourMap(std::map<BrickColour, cv::Scalar>& brickMap) { m_brickColourMap = std::make_shared<std::map<BrickColour, cv::Scalar>>(brickMap); };
         static cv::Mat processChannel(const cv::Mat image, const cv::Mat& example, int& boundry, BrickCV::ChannelType channelType);
         const BrickColour getBrickApproximation(const cv::Mat& colourSample);
+        cv::Mat findPixelsWithColourInRange(const cv::Mat input, const cv::Scalar colour); 
 
         std::shared_ptr<std::map<BrickCV::BrickColour, cv::Scalar>> m_brickColourMap = nullptr;
     private:

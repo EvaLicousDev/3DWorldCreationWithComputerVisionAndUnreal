@@ -118,7 +118,7 @@ int main()
     cv::split(noLowRedGreen, greenChanFinal);
     cv::Mat green = greenChanFinal[greenOrAxis]; 
 
-    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, demo, demo);
+    auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, true, true);
     auto plateRectangle = processor.getPlateRectangle();
     auto plate = plateRectangle.lock();
 

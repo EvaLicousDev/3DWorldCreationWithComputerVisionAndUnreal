@@ -20,7 +20,7 @@ namespace Errors
         {
             //Print to console 
             std::cout.flush();
-            system("Color 0D"); //temporarely make consol colour purple
+            system("Color 0D"); //temporarely make consol colour to black and purple
             std::cout << Errors::getErrorMessage(errorType) << "\n"; 
             std::cout << "\t \t \t";
             addArgumentsToLine(std::cout, std::forward<Args>(args)...);
@@ -33,7 +33,7 @@ namespace Errors
                 appendfile << "\t \t \t"; 
                 addArgumentsToLine(std::forward<std::ofstream>(appendfile), std::forward<Args>(args)...);
             }
-            system("Color 0F");
+            system("Color 0F"); //change back to black and white
         }
 
     private:

@@ -35,6 +35,24 @@ cv::Mat AbsColourDistance::ColourDetector::processChannel(const cv::Mat image, c
     return output;
 }
 
+cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRange(const cv::Mat input, const cv::Scalar colour)
+{
+    cv::Mat labColour;
+    cv::cvtColor(input, labColour, cv::COLOR_BGR2Lab);
+    cv::Mat rgbToLab = cv::Mat(input.rows*0.2, input.cols*0.2, CV_8UC3, colour);
+    cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
+
+    cv::Scalar colourScalar = cv::mean(rgbToLab); 
+    cv::Scalar minThreshold = colourScalar * 0.90; 
+    cv::Scalar maxThreshold = colourScalar * 1.10; 
+
+    cv::Mat out; 
+
+    cv::inRange(labColour, minThreshold, maxThreshold, out);
+    cv::medianBlur(out, out, 9);
+    return out;
+}
+
 //use euclidian distance to example HTML shades to decide colour
 const BrickColour AbsColourDistance::ColourDetector::getBrickApproximation(const cv::Mat& colourSample)
 {
@@ -50,6 +68,7 @@ const BrickColour AbsColourDistance::ColourDetector::getBrickApproximation(const
         if (m_brickColourMap == nullptr)
         {
             // If we don't have a brick sample scalar, we use selected default HTML colour shades
+            // This method is prone to errors, as it does not account for light conditions being challanging 
             for (const auto shade : colourVector)
             {
                 auto shadeScalar = getBGRColour(shade);
@@ -68,16 +87,20 @@ const BrickColour AbsColourDistance::ColourDetector::getBrickApproximation(const
         else
         {
             // If we have a brick sample scalar we use that
-            auto brickShade = m_brickColourMap->at(colour);
-            cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, brickShade);
-            cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
-            auto shadeScalar = cv::mean(rgbToLab);
-
-            double distanceToEachOther = cv::norm(shadeScalar, meanColour);
-            if (distanceToEachOther < distance)
+            auto found = m_brickColourMap->find(colour);
+            if (found != m_brickColourMap->end())
             {
-                distance = distanceToEachOther;
-                bestMatch = colour;
+                auto brickShade = m_brickColourMap->at(colour);
+                cv::Mat rgbToLab = cv::Mat(colourSample.rows, colourSample.cols, CV_8UC3, brickShade);
+                cv::cvtColor(rgbToLab, rgbToLab, cv::COLOR_BGR2Lab);
+                auto shadeScalar = cv::mean(rgbToLab);
+
+                double distanceToEachOther = cv::norm(shadeScalar, meanColour);
+                if (distanceToEachOther < distance)
+                {
+                    distance = distanceToEachOther;
+                    bestMatch = colour;
+                }
             }
         }
     }

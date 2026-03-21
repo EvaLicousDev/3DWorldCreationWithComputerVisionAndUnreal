@@ -1,5 +1,8 @@
 #include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
+#include "ERRORs/ErrorOutput.h"
+#include "Histogram/ColourHistogram.h"
+#include "Histogram/HistorgramGraphCreator.h"
 
 //std includes
 #include <iostream>
@@ -9,10 +12,6 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-
-#include "ERRORs/ErrorOutput.h"
-#include "Histogram/ColourHistogram.h"
-#include "Histogram/HistorgramGraphCreator.h"
 
 void PreProcessor::ImageProcessor::setWhiteBrick(cv::Mat& image)
 {
@@ -44,7 +43,9 @@ std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& 
     cv::Mat brickMaskReddishColours;
     cv::Mat brickMaskBluishColours;
     threshold(brickChannels[redOrBlueYellow], brickMaskReddishColours, 50, 255, cv::THRESH_BINARY);
-    threshold(brickChannels[blueOrLuminance], brickMaskBluishColours, 150, 255, cv::THRESH_BINARY);
+    threshold(brickChannels[blueOrLuminance], brickMaskBluishColours, 100, 255, cv::THRESH_BINARY);
+    cv::medianBlur(brickMaskReddishColours, brickMaskReddishColours, 5); 
+    cv::medianBlur(brickMaskBluishColours, brickMaskBluishColours, 5);
     if (demo) cv::imshow("Brick mask Reds", brickMaskReddishColours);
     if (demo) cv::imshow("Brick mask Blues", brickMaskBluishColours);
     if (demo) cv::waitKey(0);
@@ -499,7 +500,7 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
     {
         if (showAllRect)
         {
-            cv::drawContours(orig, contours, contourIndex, CV_RGB(50, colour, 200), 3);
+            cv::drawContours(orig, contours, contourIndex, CV_RGB(50, colour, 255-colour), 3);
             colour = (colour < 230 ? colour + 10 : 255);
         }
 
@@ -538,10 +539,12 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
         bool foundTopRight = false;
         bool foundBotRight = false;
 
+        int tollerance = 5; 
         //find top left 
         for (auto point : largestCorners)
         {
-            if (point.x < centerOfLargest.x && point.y < centerOfLargest.y)
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x < centerOfLargest.x && point.y < centerOfLargest.y)
             {
                 orderdPoints[0] = cv::Point2f(point);
                 foundTopLeft = true;
@@ -551,7 +554,8 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
         //find top right 
         for (auto point : largestCorners)
         {
-            if (point.x > centerOfLargest.x && point.y < centerOfLargest.y)
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x > centerOfLargest.x && point.y < centerOfLargest.y)
             {
                 orderdPoints[1] = cv::Point2f(point);
                 foundTopRight = true;
@@ -561,7 +565,8 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
         //find bottom right 
         for (auto point : largestCorners)
         {
-            if (point.x > centerOfLargest.x && point.y > centerOfLargest.y)
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x > centerOfLargest.x && point.y > centerOfLargest.y)
             {
                 orderdPoints[2] = cv::Point2f(point);
                 foundBotRight = true;
@@ -571,7 +576,8 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
         //find bottom left
         for (auto point : largestCorners)
         {
-            if (point.x < centerOfLargest.x && point.y > centerOfLargest.y)
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x < centerOfLargest.x && point.y > centerOfLargest.y)
             {
                 orderdPoints[3] = cv::Point2f(point);
                 foundBotLeft = true;
@@ -624,7 +630,9 @@ cv::Point2f PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Poi
     {
         for (auto point : cont)
         {
-            if (point.x < middle.x && point.y < middle.y)
+            int tollerance = 5; 
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x < middle.x && point.y < middle.y)
             {
                 double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((middle.y - point.y) ^ 2); 
                 if (pointDistanceSquared > distanceSquared)
@@ -647,7 +655,9 @@ cv::Point2f PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Poi
     {
         for (auto point : cont)
         {
-            if (point.x > middle.x && point.y < middle.y)
+            int tollerance = 5;
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect = point.x > middle.x && point.y < middle.y)
             {
                 double pointDistanceSquared = ((point.x-middle.x) ^ 2) + ((middle.y - point.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
@@ -670,7 +680,9 @@ cv::Point2f PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Poi
     {
         for (auto point : cont)
         {
-            if (point.x < middle.x && point.y > middle.y)
+            int tollerance = 5;
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect = point.x < middle.x && point.y > middle.y)
             {
                 double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((point.y- middle.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
@@ -693,7 +705,9 @@ cv::Point2f PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Poi
     {
         for (auto point : cont)
         {
-            if (point.x > middle.x && point.y > middle.y)
+            int tollerance = 5;
+            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            if (isInLargestRect && point.x > middle.x && point.y > middle.y)
             {
                 double pointDistanceSquared = ((point.x - middle.x) ^ 2) + ((point.y - middle.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
@@ -1085,7 +1099,8 @@ cv::Mat PreProcessor::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& im
     return image;
 }
 
-//Function returns the absolute value between the three colour channels in a Vec3b object
+// Function returns the absolute value between the three colour channels in a Vec3b object
+// Function taken from OpenCV 4 cookbook
 int PreProcessor::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const
 {
     return abs(colourIn[0] - tragetColour[0])
