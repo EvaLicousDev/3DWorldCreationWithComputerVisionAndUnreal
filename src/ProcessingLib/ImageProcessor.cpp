@@ -781,13 +781,13 @@ bool PreProcessor::ImageProcessor::isWithinTollerance(cv::Rect& output)
         int acceptedDivergance = 4 * studSize;
         if (output.x > leftWhiteMarkerTL_X + acceptedDivergance || output.x < leftWhiteMarkerTL_X - acceptedDivergance)
         {
-            Errors::ErrorOutput(Errors::BrickCVErrors::X_COORDINATE_MISMATCH, "Tollerance of roughly 4 studs. Top Left X was out of bounds");
+            Errors::ErrorOutput(Errors::BrickCVErrors::COORDINATE_MISMATCH, "Tollerance of roughly 4 studs. Top Left X was out of bounds");
             return false;
         }
 
         if (output.br().x > rightWhiteMarkerTR_X + acceptedDivergance || output.br().x < rightWhiteMarkerTR_X - acceptedDivergance)
         {
-            Errors::ErrorOutput(Errors::BrickCVErrors::X_COORDINATE_MISMATCH, "Tollerance of roughly 4 studs. Bottom Right X was outside bounds");
+            Errors::ErrorOutput(Errors::BrickCVErrors::COORDINATE_MISMATCH, "Tollerance of roughly 4 studs. Bottom Right X was outside bounds");
             return false;
         }
         return true; 

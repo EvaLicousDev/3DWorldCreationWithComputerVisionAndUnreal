@@ -52,7 +52,7 @@ int main()
     //cv::namedWindow("Image to process NO BLUR");
 
     //---------------------------------------------------------
-    bool demo = false; 
+    bool demo = true; 
     bool resetLog = true; 
     //---------------------------------------------------------
     // Error log gets errased
@@ -201,7 +201,7 @@ int main()
                 const char* colour = getBrickColour(colourName);
                 string frameName = ("Avarage Colour shade: %s", colour);
 
-                auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar); 
+                auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, 0.80, 1.2); 
                 cv::imshow("colour projected on AOI with margin of 0.95 - 1.05", projectRange);
                 cv::imshow(frameName.c_str(), av);
                 cv::waitKey(0);

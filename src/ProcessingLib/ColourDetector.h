@@ -1,15 +1,22 @@
 #pragma once
 #include <opencv2/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
 
 #include "PredefinedColours.h"
 #include "BrickCVEnums/BrickColourEnum.h"
 #include "BrickCVEnums/ChannelType.h"
+#include "ERRORs/ErrorOutput.h"
+#include "ERRORs/ErrorTypes.h"
 
 #include <map>
 
+using namespace Errors; 
 using namespace BrickCV;
 namespace AbsColourDistance
 {
+    static const double sc_pi_approx = 3.14159265358979323846; 
+
     // using HTML colours https://www.w3schools.com/tags/ref_colornames.asp & https://www.computerhope.com/htmcolor.htm#color-codes
     // colour space is RGB888 as camera also uses RGB888
     class ColourDetector
@@ -20,9 +27,13 @@ namespace AbsColourDistance
         void setBrickColourMap(std::map<BrickColour, cv::Scalar>& brickMap) { m_brickColourMap = std::make_shared<std::map<BrickColour, cv::Scalar>>(brickMap); };
         static cv::Mat processChannel(const cv::Mat image, const cv::Mat& example, int& boundry, BrickCV::ChannelType channelType);
         const BrickColour getBrickApproximation(const cv::Mat& colourSample);
-        cv::Mat findPixelsWithColourInRange(const cv::Mat input, const cv::Scalar colour); 
+
+        cv::Mat findPixelsWithColourInRange(const cv::Mat input, const cv::Scalar colour, double minMargine = 0.90, double maxMargine = 1.1);
+        cv::Mat findPixelsWithColourInRangeForChannel(const cv::Mat input, const cv::Scalar colour, double minMargine, double maxMargine, ChannelType channel, bool showResult = false);
+        cv::Mat findPixelsWithColourInRangeIndividualChannels(const cv::Mat& inputBGR, const cv::Scalar& colourBGR, const ColourSpace colourSpace, double minMargineC1 = 0.9, double maxMargineC1 = 1.1, double minMargineC2 = 0.9, double maxMargineC2 = 1.1, double minMargineC3 = 0.9, double maxMargineC3 = 1.1, bool showResult = false);
 
         std::shared_ptr<std::map<BrickCV::BrickColour, cv::Scalar>> m_brickColourMap = nullptr;
+
     private:
         //All colours are stored as 24 bit hexadecimal number combination in a 32 bit integer
         const std::vector<uint32_t> purple     = { RGB888::MidnightBlue,   RGB888::Indigo,      RGB888::DarkSlateBlue };
@@ -50,5 +61,8 @@ namespace AbsColourDistance
             //note we use BGR as native format to open cv, so we swap channel positions for blue and red
             return cv::Scalar(blue, green, red);
         }
+
+        cv::Mat getLCHuvCHROMAMat(const cv::Mat& labAChannel, const cv::Mat& labBChannel, const ChannelType channelType);
+        cv::Mat getLCHuvHUEMat(const cv::Mat& labAChannel, const cv::Mat& labBChannel, const ChannelType channelType);
     };
 }
