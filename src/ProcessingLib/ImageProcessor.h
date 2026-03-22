@@ -123,7 +123,7 @@ namespace PreProcessor
         cv::Mat                                               getDrawnContours() { return drawenContours; }
         std::shared_ptr<cv::Mat>                              getLegoPXMask()    { return legoPXMask;  }
         std::shared_ptr<std::vector<cv::Rect>>                getRectangles()    { return m_boundRect; }
-        std::shared_ptr<std::vector<std::vector<cv::Point>>>  getContourPoints() { return m_contours;  }
+        std::weak_ptr<std::vector<std::vector<cv::Point>>>    getContourPoints() { return m_contours;  }
 
         void setImageOfLego(cv::Mat& image); 
         void setImageOfBricks(cv::Mat& image);

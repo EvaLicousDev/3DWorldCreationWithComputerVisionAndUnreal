@@ -53,6 +53,7 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRange(const cv:
 
     cv::inRange(labColour, minThreshold, maxThreshold, out);
     cv::medianBlur(out, out, 9);
+    out.convertTo(out, CV_8UC1, 255); 
     return out;
 }
 
@@ -169,7 +170,7 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRangeIndividual
     double maxMargineC2, // = 1.1, 
     double minMargineC3, // = 0.9, 
     double maxMargineC3, // = 1.1, 
-    bool showResult //= false
+    bool showResult      // = false
 )
 {
     if (inputBGR.dims != 3)
@@ -259,15 +260,15 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvCHROMAMat(const cv::Mat& labA
     //convert to suitable datatype
     cv::Mat labA;
     cv::Mat labB;
-    labAChannel.convertTo(labA, CV_32F); 
-    labBChannel.convertTo(labB, CV_32F);
+    labAChannel.convertTo(labA, CV_64F); 
+    labBChannel.convertTo(labB, CV_64F);
 
     //loop over all pixels in the images and apply transform to outpu
     for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
     {
-        auto labAPx = labA.ptr<float>(rowIndex);
-        auto labBPx = labB.ptr<float>(rowIndex);
-        auto outPx = outMask.ptr<float>(rowIndex);
+        auto labAPx = labA.ptr<double>(rowIndex);
+        auto labBPx = labB.ptr<double>(rowIndex);
+        auto outPx = outMask.ptr<double>(rowIndex);
 
         for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
         {
@@ -308,8 +309,8 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvHUEMat(const cv::Mat& labACha
     //convert to suitable datatype
     cv::Mat labA;
     cv::Mat labB;
-    labAChannel.convertTo(labA, CV_32F);
-    labBChannel.convertTo(labB, CV_32F);
+    labAChannel.convertTo(labA, CV_64F);
+    labBChannel.convertTo(labB, CV_64F);
 
     //loop over all pixels in the images and apply transform to outpu
     for (auto rowIndex = 0; rowIndex < rows; rowIndex++)

@@ -27,32 +27,8 @@ int main()
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
 
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_Test.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_DAY_2.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_DARK_Test.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/NORM_DAY2.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/NORM_DARK.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_CAM2.jpg"
-
-
-    //Example bricks
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_Red.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Purple.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_LightGreen.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Pink2.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_DarkBlue.jpg";
-    //const char* histPath = "C:/Users/evali/Pictures/HDR_DAY_2_Head.jpg";
-
-
-    //Get the desired image from location 
-    //cv::namedWindow("Image to process NO BLUR");
-
     //---------------------------------------------------------
-    bool demo = true; 
+    bool demo = false; 
     bool resetLog = true; 
     //---------------------------------------------------------
     // Error log gets errased
@@ -193,43 +169,106 @@ int main()
 
         detector.setBrickColourMap(brickScalarMap); 
 
-        if (demo)
+        demo = true; 
+        std::map<BrickColour, std::shared_ptr<cv::Mat>> projections;
+        for (const auto [colourName, scalar] : brickScalarMap)
         {
-            for (const auto [colourName, scalar] : brickScalarMap)
+            //make image of colour value and use it to identify pixels within threshold
+            auto av = cv::Mat(300, 300, CV_8UC3, scalar);
+            auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, 0.85, 1.15);
+
+            //make image of brick
+            auto rect = brickColourMap.at(colourName);
+            cv::Mat brickMat = exampleBricks(rect);
+
+            //use brick image to get template matching 
+            cv::Mat minnimaMostLikely;
+            cv::matchTemplate(legoPlate, brickMat, minnimaMostLikely, TemplateMatchModes::TM_SQDIFF_NORMED);
+
+            //invert matching info in preperation of merge
+            cv::Mat resultMap = 1.0 - minnimaMostLikely;
+            resultMap.convertTo(resultMap, CV_8UC1, 255);
+            cv::medianBlur(resultMap, resultMap, 9);
+
+            //ensure images are same size and add
+            cv::resize(resultMap, resultMap, cv::Size(projectRange.cols, projectRange.rows));
+            cv::add(resultMap, projectRange, resultMap);
+
+            projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
+
+            if (demo)
             {
-                auto av = cv::Mat(300, 300, CV_8UC3, scalar);
                 const char* colour = getBrickColour(colourName);
                 string frameName = ("Avarage Colour shade: %s", colour);
-
-                auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, 0.80, 1.2); 
-                cv::imshow("colour projected on AOI with margin of 0.95 - 1.05", projectRange);
+                cv::imshow("Result heatmap: Template matching + euclidian distance", resultMap);
                 cv::imshow(frameName.c_str(), av);
+                cv::imshow("Brick", brickMat);
                 cv::waitKey(0);
-
             }
         }
 
+        /*
         // get Features with MSER ( open CV algorithm that does iterative thresholding and looks for regions that stay together )
         // with access to the contributer verion of open CV ximgproc/segmentation.hpp -> Graphbased segmentation would be an intersting alternative here 
         mserOutMask = processor.getMSERMask(legoPlate, true);
         processor.getContourData(mserOutMask, false);
-        cv::Mat contoursMSER = processor.applySobel(mserOutMask, 3); 
-        processor.getContourData(contoursMSER, false);
+        cv::Mat lab;
+        cv::Mat labC[3];
+        cv::cvtColor(legoPlate, lab, cv::COLOR_BGR2Lab);
+        cv::split(lab, labC);
+        cv::add(labC[1], mserOutMask, mserOutMask);
+        //cv::medianBlur(mserOutMask, mserOutMask, 3);
+        cv::normalize(mserOutMask, mserOutMask, 0, 255, cv::NORM_MINMAX); 
+        //cv::Mat contoursMSER = processor.applySobel(mserOutMask, 3);
 
-        cv::threshold(contoursMSER, contoursMSER, 0, 255, THRESH_BINARY_INV); 
+        //cv::imshow("joint mask", contoursMSER);
+        //v::waitKey(0);
+
+        int minSize = (legoPlate.cols / 32); 
+
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(mserOutMask, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE); //at this stage we do not want to remove any redundant points
+        auto closedContours = std::vector<std::vector<cv::Point>>(contours.size());
+        for (int i = 0; i < contours.size(); i++)
+        {
+            //create closed contours through approximation
+            auto epsilon = cv::arcLength(contours[i], true) * 0.01;
+            cv::approxPolyDP(contours[i], closedContours[i], epsilon, true);
+        }
+
+        auto outCV = cv::Mat(legoPlate.cols, legoPlate.rows, CV_32F); 
+        for (int b = 0; b < closedContours.size(); b++)
+        {
+            //iterate over closed contours and fill in colours 
+            //first create mask and get pixels from lego plate
+            if (!(cv::contourArea(closedContours[b]) < (minSize * minSize)))
+            {
+                cv::Mat legoPixls;
+                cv::Mat contourMask = cv::Mat::zeros(legoPlate.rows, legoPlate.cols, CV_8UC1);
+                cv::drawContours(contourMask, closedContours, b, Scalar(255, 255, 255), -1);
+                legoPlate.copyTo(legoPixls, contourMask);
+
+                cv::imshow("contour mask", legoPixls);
+                cv::waitKey(0);
+            }
+        }
+
+      //  cv::threshold(contoursMSER, contoursMSER, 0, 255, THRESH_BINARY_INV); 
 
         // convert image to LAB colour space to prepare height map generation and & colour detection
-        cv::Mat legoLAB;
-        cv::Mat labChannels[3]; 
-        cv::cvtColor(legoPlate, legoLAB, COLOR_BGR2Lab); 
-        cv::split(legoLAB, labChannels);
-        cv::Mat blueYellow = labChannels[redOrBlueYellow]; 
-        cv::Mat map = processor.createMapWithContoursAndLABchannel(blueYellow, contoursMSER);
+        //cv::Mat legoLAB;
+        //cv::Mat labChannels[3]; 
+        //cv::cvtColor(legoPlate, legoLAB, COLOR_BGR2Lab); 
+        //cv::split(legoLAB, labChannels);
+        //cv::Mat blueYellow = labChannels[redOrBlueYellow]; 
+        //cv::Mat map = processor.createMapWithContoursAndLABchannel(blueYellow, contoursMSER);
 
-        if (demo) imshow("MAP", map);
-        if (demo) imshow("Feature detection", mserOutMask);
-        if (demo) cv::waitKey(0);
+        //if (demo) imshow("MAP", map);
+        //if (demo) imshow("Feature detection", mserOutMask);
+        //if (demo) cv::waitKey(0);
+        */
 
+        /*
         bool showProjection = demo;
         for (auto brick : bricks)
         {
@@ -237,11 +276,6 @@ int main()
             auto pixels = processor.backprojectHistogram(legoPlate, brickMat, 150);
             cv::Mat showPixls;
             legoPlate.copyTo(showPixls, pixels);
-
-            cv::Mat res;
-            cv::matchTemplate(legoPlate, brickMat, res, TemplateMatchModes::TM_SQDIFF_NORMED);
-            imshow("template matching", res);
-            cv::waitKey(2);
 
             if (showProjection)
             {
@@ -258,6 +292,7 @@ int main()
                 cv::waitKey(2);
             }
         }
+        */
     }
 
     cv::waitKey(0);

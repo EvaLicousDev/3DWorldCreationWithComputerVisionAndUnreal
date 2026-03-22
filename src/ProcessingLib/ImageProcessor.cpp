@@ -76,7 +76,7 @@ std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& 
                     auto smallerRectTLY = rectangleInstance.tl().y + (rectangleInstance.height *0.8);
                     auto smallerRectBRX = rectangleInstance.br().x - (rectangleInstance.width *0.8);
                     auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height * 0.8 );
-                    cv::Rect smallerRect(cv::Point(smallerRectTLX, smallerRectTLY), cv::Point(smallerRectBRX, smallerRectBRY)); 
+                    cv::Rect smallerRect(cv::Point(static_cast<int>(smallerRectTLX), static_cast<int>(smallerRectTLY)), cv::Point(static_cast<int>(smallerRectBRX), static_cast<int>(smallerRectBRY)));
 
                     if (showResult) cv::rectangle(brickAreaCopy, rectangleInstance, CV_RGB(255,0,255), 3);
                     if (showResult) cv::rectangle(brickAreaCopy, smallerRect, CV_RGB(0, 255, 0), 3);
@@ -743,13 +743,14 @@ cv::Rect PreProcessor::ImageProcessor::getPlateWithGreenChannel(cv::Mat unproces
 
     this->getContourData(edges, false);
     auto contourPoints = this->getContourPoints();
-    auto largest = this->findLargestVoliumSquareContour(*contourPoints);
+    auto locked = contourPoints.lock(); 
+    auto largest = this->findLargestVoliumSquareContour(*locked);
 
     if (showResult)
     {
         cv::Mat imagecopy; 
         unprocessedROI.copyTo(imagecopy);
-        for (auto contour : *contourPoints)
+        for (auto contour : *locked)
         {
             auto rec = cv::boundingRect(contour);
             cv::rectangle(imagecopy, rec, CV_RGB(50, 200, 150),2);
