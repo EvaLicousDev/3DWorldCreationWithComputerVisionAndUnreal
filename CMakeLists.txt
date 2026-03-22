@@ -10,6 +10,7 @@ endif()
 
 project (OpenCVLegoMapScannerV1)
 set( CMAKE_CXX_STANDARD 20 )
+add_definitions(-DIMAGE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ImageFolder")
 
 #computer vision library
 find_package(OpenCV REQUIRED)

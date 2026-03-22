@@ -18,7 +18,8 @@ namespace Errors
         WRONG_COLOUR_CHANNEL = 10,
         COMPUT_MORE_EFFICENT_OPT_AVAILABLE = 11,
         COLOUR_SPACE_MISMATCH = 12,
-        IMAGE_NOT_3_CHANNEL = 13
+        IMAGE_NOT_3_CHANNEL = 13,
+        IMAGE_WASNT_READ_RIGHT = 14
     };
 
     static const constexpr char* getErrorMessage(const BrickCVErrors& error)
@@ -73,6 +74,9 @@ namespace Errors
             break;
         case IMAGE_NOT_3_CHANNEL:
             return "[ERROR] \t [This fucntion expects a 3 channel image] \n";
+            break;
+        case IMAGE_WASNT_READ_RIGHT:
+            return "[ERROR] \t [An image loaded and emplaced in the file reader vector was empty] \n";
             break;
         default:
             return "------------------------------------------------------------------- \n [UNKNOWN ERROR] \n \t \t I can't belive this. It done goofed!! How could this happen?? \n \t \t The anguish! \n \t \t Anyway, something went really wrong if you see this. Better check what happened... \n ------------------------------------------------------------------- \n";
