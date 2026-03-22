@@ -21,14 +21,14 @@ int main()
 {
     std::cout << "Starting Preprocessing" << std::endl;
     //Example images
-    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
+    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP1.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP2.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP3.jpg";
     //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP4.jpg";
-    //const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
+    const char* filepath = "C:/Users/evali/Pictures/HDR_MAP5.jpg";
 
     //---------------------------------------------------------
-    bool demo = false; 
+    bool demo = true; 
     bool resetLog = true; 
     //---------------------------------------------------------
     // Error log gets errased
@@ -190,12 +190,18 @@ int main()
             resultMap.convertTo(resultMap, CV_8UC1, 255);
             cv::medianBlur(resultMap, resultMap, 9);
 
+            auto lchHueChannel = detector.findPixelsWithColourInRangeForChannel(legoPlate, scalar, 0.98, 1.02, ChannelType::LCHuv_HUE, false);
+            auto lchCromaChannel = detector.findPixelsWithColourInRangeForChannel(legoPlate, scalar, 0.98, 1.02, ChannelType::LCHuv_CHROMA, false);
+            cv::Mat chromaHue; 
+            cv::add(lchHueChannel, lchCromaChannel*0.3, chromaHue);
+            cv::medianBlur(chromaHue, chromaHue, 9);
+
             // ensure images are same size and add
+            cv::resize(lchHueChannel, lchHueChannel, cv::Size(legoPlate.cols, legoPlate.rows));
             cv::resize(resultMap, resultMap, cv::Size(legoPlate.cols, legoPlate.rows));
             cv::resize(projectRange, projectRange, cv::Size(legoPlate.cols, legoPlate.rows));
+            if(colourName != BrickColour::WHITE && colourName != BrickColour::BROWN) cv::add(resultMap, chromaHue, resultMap);
             cv::add(resultMap, projectRange, resultMap);
-
-            auto lchTest = detector.findPixelsWithColourInRangeIndividualChannels(legoPlate, scalar, ColourSpace::LCHuv, 0.85, 1.1, 0.85, 1.1, 0.9, 1.1, true); 
 
             projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
 
@@ -203,9 +209,9 @@ int main()
             {
                 const char* colour = getBrickColour(colourName);
                 string frameName = ("Avarage Colour shade: %s", colour);
-                cv::imshow("LCHuv test", lchTest);
-                cv::imshow("Result heatmap: Template matching + euclidian distance", resultMap);
-                cv::imshow(frameName.c_str(), av);
+                cv::imshow("LCHuv test", chromaHue);
+                cv::imshow(frameName.c_str(), resultMap);
+                cv::imshow("scalar", av);
                 cv::imshow("Brick", brickMat);
                 cv::waitKey(0);
             }
