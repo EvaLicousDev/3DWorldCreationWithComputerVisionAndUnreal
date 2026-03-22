@@ -177,22 +177,25 @@ int main()
             auto av = cv::Mat(300, 300, CV_8UC3, scalar);
             auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, 0.85, 1.15);
 
-            //make image of brick
+            // make image of brick
             auto rect = brickColourMap.at(colourName);
             cv::Mat brickMat = exampleBricks(rect);
 
-            //use brick image to get template matching 
+            // use brick image to get template matching 
             cv::Mat minnimaMostLikely;
             cv::matchTemplate(legoPlate, brickMat, minnimaMostLikely, TemplateMatchModes::TM_SQDIFF_NORMED);
 
-            //invert matching info in preperation of merge
+            // invert matching info in preperation of merge
             cv::Mat resultMap = 1.0 - minnimaMostLikely;
             resultMap.convertTo(resultMap, CV_8UC1, 255);
             cv::medianBlur(resultMap, resultMap, 9);
 
-            //ensure images are same size and add
-            cv::resize(resultMap, resultMap, cv::Size(projectRange.cols, projectRange.rows));
+            // ensure images are same size and add
+            cv::resize(resultMap, resultMap, cv::Size(legoPlate.cols, legoPlate.rows));
+            cv::resize(projectRange, projectRange, cv::Size(legoPlate.cols, legoPlate.rows));
             cv::add(resultMap, projectRange, resultMap);
+
+            auto lchTest = detector.findPixelsWithColourInRangeIndividualChannels(legoPlate, scalar, ColourSpace::LCHuv, 0.85, 1.1, 0.85, 1.1, 0.9, 1.1, true); 
 
             projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
 
@@ -200,6 +203,7 @@ int main()
             {
                 const char* colour = getBrickColour(colourName);
                 string frameName = ("Avarage Colour shade: %s", colour);
+                cv::imshow("LCHuv test", lchTest);
                 cv::imshow("Result heatmap: Template matching + euclidian distance", resultMap);
                 cv::imshow(frameName.c_str(), av);
                 cv::imshow("Brick", brickMat);

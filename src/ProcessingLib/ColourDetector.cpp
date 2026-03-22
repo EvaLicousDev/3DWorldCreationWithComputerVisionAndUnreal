@@ -146,13 +146,14 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRangeForChannel
         }
     }
 
-    cv::threshold(img, img, minMargine, maxMargine, cv::THRESH_BINARY); 
-    cv::medianBlur(out, out, 9);
+    double colourVal, maxVal; 
+    cv::minMaxIdx(scal, &colourVal, &maxVal); 
+    cv::inRange(img, cv::Scalar(maxVal*minMargine), cv::Scalar(maxVal*maxMargine), out); 
 
     if (showResult)
     {
         std::string name{ getChannelName(channel) + std::to_string(minMargine) + " - " + std::to_string(maxMargine)};
-        cv::imshow(name.c_str(), img);
+        cv::imshow(name.c_str(), out);
         cv::waitKey(0);
     }
 
@@ -211,7 +212,7 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRangeIndividual
         cv::normalize(thirdChannel, thirdChannel, 0.0, 255.0, cv::NORM_MINMAX);
 
         cv::add(firstChannel, secondChannel, outMask);
-        cv::threshold(outMask, outMask, 5, 255, cv::THRESH_BINARY); 
+        //cv::threshold(outMask, outMask, 5, 255, cv::THRESH_BINARY); 
         cv::add(outMask, thirdChannel, outMask);
         cv::threshold(outMask, outMask, 5, 255, cv::THRESH_BINARY);
 
@@ -260,8 +261,8 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvCHROMAMat(const cv::Mat& labA
     //convert to suitable datatype
     cv::Mat labA;
     cv::Mat labB;
-    labAChannel.convertTo(labA, CV_64F); 
-    labBChannel.convertTo(labB, CV_64F);
+    labAChannel.convertTo(labA, CV_64F,128); 
+    labBChannel.convertTo(labB, CV_64F,128);
 
     //loop over all pixels in the images and apply transform to outpu
     for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
@@ -273,7 +274,7 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvCHROMAMat(const cv::Mat& labA
         for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
         {
             // Chroma -> C = sqrt((a^2 + b^2)) - https://www.chnspec.net/What-is-the-Lab-Color-Space-LCh.html#:~:text=Lab:%20Uses%20Cartesian%20coordinates%20to,%2C%20and%20Hue%20(h)
-            auto pxValue = std::sqrt((std::pow(*labAPx, 2.0) + std::pow(*labBPx, 2.0)));
+            auto pxValue = std::sqrt((std::pow(labAPx[columnIndex], 2.0) + std::pow(labBPx[columnIndex], 2.0)));
             outPx[columnIndex] = pxValue; 
         }
     }
@@ -323,7 +324,7 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvHUEMat(const cv::Mat& labACha
         {
             // Hue -> h = arctan(b/a) * (180/pi) - https://www.chnspec.net/What-is-the-Lab-Color-Space-LCh.html#:~:text=Lab:%20Uses%20Cartesian%20coordinates%20to,%2C%20and%20Hue%20(h)
             // This means the pixel value will represent an angle - https://www.chnspec.net/What-is-the-Lab-Color-Space-LCh.html#:~:text=Lab:%20Uses%20Cartesian%20coordinates%20to,%2C%20and%20Hue%20(h).
-            auto pxValue = std::atan((*labBPx / *labAPx)) * (180.0 / sc_pi_approx);
+            auto pxValue = std::atan((labBPx[columnIndex] / labAPx[columnIndex])) * (180.0 / sc_pi_approx);
             outPx[columnIndex] = pxValue;
         }
     }
