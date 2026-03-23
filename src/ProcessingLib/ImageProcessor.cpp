@@ -1,4 +1,5 @@
 #include "ImageProcessor.h"
+#include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
 #include "ERRORs/ErrorOutput.h"
 #include "Histogram/ColourHistogram.h"
@@ -17,6 +18,26 @@ void PreProcessor::ImageProcessor::setWhiteBrick(cv::Mat& image)
 {
     whiteBrick = std::make_shared<cv::Mat>(image);
 }
+
+void PreProcessor::ImageProcessor::addToHeightMap(const cv::Mat& info)
+{
+    //for a 4km x 4km map we need 4000 x 4000 px in unreal: we use 1px for 1 m^2
+    cv::Mat infoReshaped;
+    cv::resize(info, infoReshaped, cv::Size(sc_pixelsInHeightMap,sc_pixelsInHeightMap)); 
+    if (heightMap == nullptr)
+    {
+        heightMap = std::make_shared<cv::Mat>(infoReshaped);
+    }
+    else
+    {
+        cv::Mat added; 
+        cv::add(*heightMap, infoReshaped, added);
+        cv::normalize(added,added,0,255);
+        heightMap.reset();
+        heightMap = std::make_shared<cv::Mat>(added);
+    }
+}
+
 void PreProcessor::ImageProcessor::setImageOfLego(cv::Mat& image)
 {
     imageOfLego = std::make_shared<cv::Mat>(image); 
@@ -24,11 +45,6 @@ void PreProcessor::ImageProcessor::setImageOfLego(cv::Mat& image)
 
 void PreProcessor::ImageProcessor::setImageOfBricks(cv::Mat& image)
 {
-    //we crop the bricks to just use the middle section of the image
-    //auto sampleY = (image.cols / 3);
-    //cv::Rect crop(0, sampleY, image.cols-1, image.rows-1);
-    //cv::Mat cropped = image(crop);
-    //imageOfBricks = std::make_shared<cv::Mat>(cropped);
     imageOfBricks = std::make_shared<cv::Mat>(image);
 }
 

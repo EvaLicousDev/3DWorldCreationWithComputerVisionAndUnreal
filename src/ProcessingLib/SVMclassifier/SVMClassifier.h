@@ -9,6 +9,8 @@
 //Open CV includes 
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/core.hpp>
+#include <opencv2/ml.hpp>
+
 using namespace BrickCV; 
 namespace brickColourSVM
 {
@@ -29,8 +31,9 @@ namespace brickColourSVM
             theOne = oneVSall; 
 
             // --------------------Get all trainings data from folders-----------------------
-            auto images = std::vector<cv::String>();
+            auto imagesPath = std::vector<cv::String>();
             auto labels = std::vector<int>(); 
+
             //populate folder paths
             for (auto colour : coloursToTrain)
             {
@@ -38,29 +41,38 @@ namespace brickColourSVM
                 cv::String path(folderpath); 
 
                 //Find every file in pattern following the "path" pattern
-                cv::glob(path, images, false); 
+                cv::glob(path, imagesPath, false); 
 
-                for (auto imagePath : images)
+                for (const auto imagePath : imagesPath)
                 {
                     auto data = UnprocessedTrainingDataInstance(imagePath, colour); 
                     trainingData.emplace_back(data); 
                     int label = (colour == theOne ? 1 : -1); //where -1 is the label for any other colour than "theOne"
                     labels.emplace_back(label); 
                 }
-                images.clear(); 
+                imagesPath.clear(); 
             }
             // -------------------------------------------------------------------------------
 
             // ---------------------Format trainings data for OpenCV---------------------------
-            int labels[4] = { 1, -1, -1, -1 };
-            float trainingData[4][2] = { {501, 10}, {255, 10}, {501, 255}, {10, 501} };
+            /*
+            auto examples = trainingData.size();
+            std::vector<std::vector<float>> reformattedTrainingData;
+            for (auto dataPoint : trainingData)
+            {
+                std::vector<float> dataVector; 
+                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[0]); //Red
+                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[1]); //Green
+                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[2]); //Blue
+                dataVector.emplace_back(dataPoint.histogramLAB_Achannel();
+            }
 
-            /*=
+                
             // Train the SVM
-            Ptr<SVM> svm = SVM::create();
-            svm->setType(SVM::C_SVC);
-            svm->setKernel(SVM::LINEAR);
-            svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 100, 1e-6));
+            cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
+            svm->setType(cv::ml::SVM::C_SVC);
+            svm->setKernel(cv::ml::SVM::RBF);
+            svm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, 10000, 1e-6));
             svm->train(trainingDataMat, ROW_SAMPLE, labelsMat);
 
             // Data for visual representation
@@ -100,10 +112,10 @@ namespace brickColourSVM
                 circle(image, Point((int)v[0], (int)v[1]), 6, Scalar(128, 128, 128), thickness);
             }
 
-            imwrite("result.png", image);        // save the image
+            cv::imwrite("result.png", image);        // save the image
 
-            imshow("SVM Simple Example", image); // show it to the user
-            waitKey();
+            cv::imshow("SVM Simple Example", image); // show it to the user
+            cv::waitKey(0);
             */
         }
 

@@ -195,7 +195,6 @@ int main()
 
                 detector.setBrickColourMap(brickScalarMap);
 
-                demo = true;
                 std::map<BrickColour, std::shared_ptr<cv::Mat>> projections;
                 for (const auto [colourName, scalar] : brickScalarMap)
                 {
@@ -211,7 +210,7 @@ int main()
                     cv::Mat minnimaMostLikely;
                     cv::matchTemplate(legoPlate, brickMat, minnimaMostLikely, TemplateMatchModes::TM_SQDIFF_NORMED);
 
-                    // invert matching info in preperation of merge
+                    // template matching creates a map with a global minnimum to represent the best match, so we invert it
                     cv::Mat resultMap = 1.0 - minnimaMostLikely;
                     resultMap.convertTo(resultMap, CV_8UC1, 255);
                     cv::medianBlur(resultMap, resultMap, 9);
@@ -226,10 +225,19 @@ int main()
                     cv::resize(lchHueChannel, lchHueChannel, cv::Size(legoPlate.cols, legoPlate.rows));
                     cv::resize(resultMap, resultMap, cv::Size(legoPlate.cols, legoPlate.rows));
                     cv::resize(projectRange, projectRange, cv::Size(legoPlate.cols, legoPlate.rows));
+
+                    // Brown & white rely heavily on the (here) unprocessed channel in LCH, so we don't want it's information for those colours 
                     if (colourName != BrickColour::WHITE && colourName != BrickColour::BROWN) cv::add(resultMap, chromaHue, resultMap);
                     cv::add(resultMap, projectRange, resultMap);
 
                     projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
+
+                    //In our heightmap we want rivers to be at the deepest point, so we invert the projection and add to the heightmap
+                    if (colourName == BrickColour::DARK_BLUE)
+                    {
+                        cv::Mat deepRivers = 255 - resultMap; 
+                        processor.addToHeightMap(deepRivers); 
+                    }
 
                     if (demo)
                     {
@@ -259,6 +267,45 @@ int main()
                         cv::waitKey(0);
                     }
                 }
+
+                // finish getting heightmap info
+                // we layer over infromation from the colour detection algorithm with some random noise
+                auto heightMap = processor.getHeightMap().lock().get(); 
+                cv::normalize(*heightMap, *heightMap, 0, 255, NORM_MINMAX);
+
+                cv::Mat dist = cv::Mat(heightMap->rows, heightMap->cols, CV_8UC1); 
+                cv::randn(dist, 70, 30);
+                int zoom = dist.rows / 100;
+                cv::Rect distRect(0, 0, zoom, zoom);
+                cv::Mat noiseZoom = dist(distRect);
+                resize(noiseZoom, noiseZoom, cv::Size(heightMap->cols, heightMap->rows));
+                cv::normalize(noiseZoom, noiseZoom, 0, 100, NORM_MINMAX);
+                cv::medianBlur(noiseZoom, noiseZoom, 25);
+                cv::add(*heightMap, noiseZoom, dist); 
+                cv::medianBlur(dist, dist, 15);
+                cv::normalize(dist, dist,0,255, NORM_MINMAX);
+
+                //isolate big white blops in height map
+                cv::Mat tooHighAreas;
+                cv::threshold(dist, tooHighAreas, 230,255, THRESH_BINARY);
+                cv::Mat noiseAdded;
+                noiseZoom.copyTo(noiseAdded, tooHighAreas); 
+                cv::Mat out = dist * 0.5;
+                cv::GaussianBlur(dist, dist, cv::Size(15,15), 5, 5);
+                cv::add(out, noiseAdded, out);
+                cv::normalize(out, out, 0, 100, NORM_MINMAX);
+                cv::GaussianBlur(out, out, cv::Size(15, 15), 50, 50);
+
+                demo = true; 
+                if (demo) cv::imshow("HeightMap", out);
+                if (demo) cv::waitKey(0);
+
+                
+
+                //convert to unreal engine height map format
+                out.convertTo(out, CV_16F, 1.0); 
+                cv::resize(out, out, cv::Size(sc_pixelsInHeightMap, sc_pixelsInHeightMap));
+                cv::imwrite("heightMap.png", out);
             }
         } 
         else

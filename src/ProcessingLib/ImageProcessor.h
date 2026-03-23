@@ -28,11 +28,13 @@ namespace PreProcessor
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
-    static constexpr int sc_coloursToIdentify = 8;
-    static const int sc_greenBlueLowerAxis = -126;
-    static const int sc_greenBlueUpperAxis = 0;
-    static const int sc_greenBlueLowerBY = -128;
-    static const int sc_greenBlueUpperBY = 128;
+    static const constexpr int sc_pixelsInHeightMap  = 2000; 
+    static const constexpr int sc_coloursToIdentify  = 8;
+    static const constexpr int sc_greenBlueLowerAxis = -126;
+    static const constexpr int sc_greenBlueUpperAxis = 0;
+    static const constexpr int sc_greenBlueLowerBY   = -128;
+    static const constexpr int sc_greenBlueUpperBY   = 128;
+
     class ImageProcessor
     {
         /*
@@ -130,6 +132,8 @@ namespace PreProcessor
         void setWhiteBrick(cv::Mat& image);
         std::shared_ptr<cv::Mat> getBrickSample() { return imageOfBricks; }
 
+        void addToHeightMap(const cv::Mat& info); 
+        std::weak_ptr<cv::Mat> getHeightMap() { return heightMap;  }
     private:
         bool isWithinTollerance(cv::Rect& output); 
 
@@ -140,6 +144,7 @@ namespace PreProcessor
         std::shared_ptr<cv::Mat> imageOfLego = nullptr; 
         std::shared_ptr<cv::Mat> imageOfBricks = nullptr;
         std::shared_ptr<cv::Mat> whiteBrick = nullptr;
+        std::shared_ptr<cv::Mat> heightMap = nullptr;
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
 
         std::shared_ptr<cv::Mat> legoPXMask = nullptr;
