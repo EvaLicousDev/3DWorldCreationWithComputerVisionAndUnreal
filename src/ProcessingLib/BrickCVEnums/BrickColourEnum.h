@@ -78,6 +78,6 @@ namespace BrickCV
         }
     }
 
-    //this array should contain the colours available in the top area or lego plate in order, igonoring the first white brick
-    static const constexpr BrickColour sc_coloursInUse[] = { WHITE, PURPLE, DARK_BLUE, LIGHT_BLUE, BROWN, RED, ORANGE, YELLOW, LIGHT_GREEN, DARK_GREEN };
+    //this array should contain the colours available in the top area or lego plate in order left to right, not containing the base colour
+    static const constexpr BrickColour sc_coloursInUse[] = { WHITE, PURPLE, DARK_BLUE, LIGHT_BLUE, BROWN, RED, ORANGE, YELLOW, LIGHT_GREEN };
 }

@@ -17,13 +17,19 @@ using namespace PreProcessor;
 // Image directory defined in CMake Lists file
 static const std::string sc_imageFilesPattern = std::string(IMAGE_DIR) + "/*.jpg";
 
+
+// IMPORTANT INFORMATION:
+// This code works on the predefined range of colours in BrickCVEnum/BrickColourEnum -> sc_coloursInUse
+// That line needs to match the physical plate above the map area with the example colours from left to right
 int main()
 {
-    std::cout << "OPENCV LEGO MAP READER STARTED" << std::endl;
-
+    std::cout << "--------------------------------------------------------------------------------------" << std::endl;
+    std::cout << "---------------------------OPENCV LEGO MAP READER STARTED-----------------------------" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------" << std::endl;
+    
     //---------------------------------------------------------
     // Settings
-    bool demo = true; 
+    bool demo = false; 
     bool resetLog = true; 
 
     //---------------------------------------------------------
@@ -45,6 +51,7 @@ int main()
     //Begin main processing loop - try and process an image and go to the next one if that fails
     for(auto imagePtr : images)
     {
+        demo = false; 
         if (auto strongPtr = imagePtr.lock())
         {
             cv::Mat imageToProcess = *strongPtr; 
@@ -60,6 +67,9 @@ int main()
 
             if (demo) cv::imshow("currently processing this image", imageToProcess);
             if (demo) cv::waitKey(0);
+
+            //---------------------------------------------------------
+            //Find the inital region of interest with simple thresholding
 
             // We find the lighter colours in the Red channel to seperate light green and yellow form dark Green before looking 
             // for the dark green corner pieces
@@ -97,11 +107,10 @@ int main()
             if (demo) imshow("Presumed Green areas", noLowRedGreen);
             if (demo) waitKey(0);
 
-            cv::Mat mserOutMask;
-            cv::Mat greenChanFinal[3];
-            cv::split(noLowRedGreen, greenChanFinal);
-            cv::Mat green = greenChanFinal[greenOrAxis];
-
+            //---------------------------------------------------------
+            // Find points to apply transform on ROI to offset the camera angle and distortion
+            // For this we go over all the contours, create a bounding box around the largest
+            // and use the center of said bounding box to find the outer corners of the lego plate
             auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, demo, demo);
             auto plateRectangle = processor.getPlateRectangle();
             auto plate = plateRectangle.lock();
@@ -109,8 +118,7 @@ int main()
             if (!presumedROI.empty() && plate != nullptr)
             {
                 // apply transform now that we know corners of plate
-                // we first need the matrix
-                // we use the largest volium rectangle as base  
+                // to find the transformation matrix we use the largest rectangle we found around the plate as our base
                 cv::Mat corrected = cv::Mat::zeros(imageToProcess.cols, imageToProcess.rows, CV_32F);
                 auto destinationPoints = std::vector<cv::Point2f>();
                 cv::Point2f topLeft(cv::Point2f(plate->tl()));
@@ -139,6 +147,9 @@ int main()
                 processor.setImageOfLego(legoPlate);
                 processor.setImageOfBricks(exampleBricks);
 
+                //make plate square now that we have the right area
+                resize(legoPlate, legoPlate, cv::Size(500, 500));
+
                 if (demo) cv::imshow("Corrected - should be \'straight\' lego plate for better coordinates.", legoPlate);
                 if (demo) cv::imshow("Bricks above board", exampleBricks);
                 if (demo) waitKey(0);
@@ -149,6 +160,13 @@ int main()
                     {
                         return left.tl().x < right.tl().x;
                     });
+
+                int numberOfColours = sizeof(sc_coloursInUse) / sizeof(sc_coloursInUse[0]);
+                if (bricks.size() != numberOfColours)
+                {
+                    ErrorOutput(BrickCVErrors::EXAMPLE_BRICKS_ERROR, "Did not correctly identify", std::to_string(numberOfColours).c_str(), "colours in the exampleBricks image.");
+                    continue; //this would scilently break the application, process next image instead
+                }
 
                 // Now we set up the colour detector with the scalars for our colours to get a better euclidian distance value
                 auto detector = AbsColourDistance::ColourDetector();
@@ -182,7 +200,7 @@ int main()
                 for (const auto [colourName, scalar] : brickScalarMap)
                 {
                     //make image of colour value and use it to identify pixels within threshold
-                    auto av = cv::Mat(300, 300, CV_8UC3, scalar);
+                    auto meanColour = cv::Mat(300, 300, CV_8UC3, scalar);
                     auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, 0.85, 1.15);
 
                     // make image of brick
@@ -215,23 +233,45 @@ int main()
 
                     if (demo)
                     {
+                        cv::Mat leg;
+                        legoPlate.copyTo(leg);
+                        cv::resize(leg, leg, cv::Size(300, 300));
+
+                        cv::Mat res;
+                        resultMap.copyTo(res);
+                        cv::resize(res,res, cv::Size(300,300));
+
+                        cv::Mat col;
+                        meanColour.copyTo(col);
+                        cv::resize(col, col, cv::Size(100, 100));
+
+                        cv::Mat brk;
+                        brickMat.copyTo(brk);
+                        cv::resize(col, col, cv::Size(100, 200));
+
                         const char* colour = getBrickColour(colourName);
                         string frameName = ("Avarage Colour shade: %s", colour);
-                        cv::imshow("LCHuv test", chromaHue);
-                        cv::imshow(frameName.c_str(), resultMap);
-                        cv::imshow("scalar", av);
-                        cv::imshow("Brick", brickMat);
+                        //cv::imshow("LCHuv test", chromaHue);
+                        cv::imshow(frameName.c_str(), res);
+                        cv::imshow("scalar", col);
+                        cv::imshow("Brick", brk);
+                        cv::imshow("Plate", leg);
                         cv::waitKey(0);
                     }
                 }
-            } //END strong imgPTR.lock
-        } //END img for loop
+            }
+        } 
         else
         {
             Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "Image pointer could not be converted into a strong reference and had to be skipped");
         }
-    }
+    }//END main img processing for loop
 
-    std::cout << "---------------------------Finished-------------------------" << endl;
+    //clean up images 
+    fileReader.~ImageReader(); 
+
+    std::cout << "--------------------------------------------------------------------------------------" << std::endl;
+    std::cout << "---------------------------OPENCV LEGO MAP READER FINISHED----------------------------" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------" << std::endl;
     return 0;
 }
