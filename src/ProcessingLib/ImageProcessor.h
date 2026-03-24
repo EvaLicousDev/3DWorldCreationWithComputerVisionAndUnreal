@@ -28,12 +28,12 @@ namespace PreProcessor
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
-    static const constexpr int sc_pixelsInHeightMap  = 2000; 
+    static const constexpr int sc_pixelsInHeightMap  = 2017*2; //https://dev.epicgames.com/documentation/en-us/unreal-engine/landscape-technical-guide-in-unreal-engine
     static const constexpr int sc_coloursToIdentify  = 8;
-    static const constexpr int sc_greenBlueLowerAxis = -126;
+    static const constexpr int sc_greenBlueLowerAxis = -127;
     static const constexpr int sc_greenBlueUpperAxis = 0;
-    static const constexpr int sc_greenBlueLowerBY   = -128;
-    static const constexpr int sc_greenBlueUpperBY   = 128;
+    static const constexpr int sc_greenBlueLowerBY   = -126;
+    static const constexpr int sc_greenBlueUpperBY   = 127;
 
     class ImageProcessor
     {

@@ -279,6 +279,9 @@ int main()
                 cv::Rect distRect(0, 0, zoom, zoom);
                 cv::Mat noiseZoom = dist(distRect);
                 resize(noiseZoom, noiseZoom, cv::Size(heightMap->cols, heightMap->rows));
+                auto slope = cv::Rect(0, 0, noiseZoom.cols, noiseZoom.rows);
+                cv::rectangle(noiseZoom, slope, cv::Scalar(50), 200);
+                cv::rectangle(noiseZoom, slope, cv::Scalar(0), 100);
                 cv::normalize(noiseZoom, noiseZoom, 0, 100, NORM_MINMAX);
                 cv::medianBlur(noiseZoom, noiseZoom, 25);
                 cv::add(*heightMap, noiseZoom, dist); 
@@ -293,17 +296,21 @@ int main()
                 cv::Mat out = dist * 0.5;
                 cv::GaussianBlur(dist, dist, cv::Size(15,15), 5, 5);
                 cv::add(out, noiseAdded, out);
-                cv::normalize(out, out, 0, 100, NORM_MINMAX);
+                cv::normalize(out, out, 100, 250, NORM_MINMAX);
+                cv::resize(out, out, cv::Size(100,100));
+                out.convertTo(out, CV_64FC1, 255.0);
+
                 cv::GaussianBlur(out, out, cv::Size(15, 15), 50, 50);
+                resize(out, out, cv::Size(heightMap->cols, heightMap->rows));
+                cv::normalize(out, out, 0, 255, NORM_MINMAX);
+                out.convertTo(out, CV_16U, 255.0);
+                cv::medianBlur(out, out, 5);
 
                 demo = true; 
                 if (demo) cv::imshow("HeightMap", out);
                 if (demo) cv::waitKey(0);
 
-                
-
                 //convert to unreal engine height map format
-                out.convertTo(out, CV_16F, 1.0); 
                 cv::resize(out, out, cv::Size(sc_pixelsInHeightMap, sc_pixelsInHeightMap));
                 cv::imwrite("heightMap.png", out);
             }
