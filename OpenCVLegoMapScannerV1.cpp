@@ -10,6 +10,7 @@
 #include <memory>
 #include <map>
 #include <fstream>
+#include <opencv2/highgui/highgui.hpp>
 
 using namespace std;
 using namespace cv;
@@ -298,7 +299,7 @@ int main()
                 noiseZoom.copyTo(noiseAdded, tooHighAreas); 
                 cv::Mat out = dist * 0.5;
                 cv::add(out, noiseAdded, out);
-                out.convertTo(out, CV_64FC1, 255.0);
+
                 cv::GaussianBlur(out, out, cv::Size(15,15), 5, 5);
                 cv::normalize(out, out, 100, 250, NORM_MINMAX);
                 cv::resize(out, out, cv::Size(100,100));
@@ -306,12 +307,14 @@ int main()
                 cv::GaussianBlur(out, out, cv::Size(15, 15), 50, 50);
                 resize(out, out, cv::Size(heightMap->cols, heightMap->rows));
                 cv::normalize(out, out, 0, 255, NORM_MINMAX);
+                cv::medianBlur(out,out,3); 
 
+                //debugOrDemoAll = true; 
                 if (debugOrDemoAll) resize(out, out, cv::Size(500,500));
                 if (debugOrDemoAll) cv::imshow("HeightMap", out);
                 if (debugOrDemoAll) cv::waitKey(0);
 
-                createHeightMapPNG = true; 
+                //createHeightMapPNG = true; 
                 if (createHeightMapPNG) processor.createHeightMapPNG(out, heightMapOutputPath); 
 
                 // for terrain generation we test the .xyz file format (eporting as .csv first) and then 
@@ -320,14 +323,20 @@ int main()
                 // 4034*4034*4 values to a csv file. 
 
                 resize(out, out, cv::Size(400,400));
-                out.convertTo(out, CV_8UC1, 255.0); //convert back to values between 0 - 255 stored as Uchars
+                out.convertTo(out, CV_8UC1); //convert back to values between 0 - 255 stored as Uchars
                 out.reshape(0, 400); //ensure image not continuous
                 auto pointDataFormatted = std::vector<uint64_t>(160000);
+                auto triangelIDs = std::vector<Vec3i>(); 
                 int vectorIndex = 0; 
 
                 auto rows = out.rows;
                 auto cols = out.cols;
 
+                //get triangles data by itterating with 4 px window
+                auto fourPixels = cv::Rect(0, 0, 2, 2); 
+
+                
+                //generating vertex data
                 if (out.channels() == 1)
                 {
                     std::cout << "[Information] \t \t About to prepare point data. This will take a while..." << std::endl;
@@ -336,10 +345,24 @@ int main()
                         uchar* rowPtr = out.ptr<uchar>(row);
                         for (int16_t col = 0; col < cols; col++)
                         {
+                            //vertex data
+                            auto zVal = rowPtr[col]; 
                             auto& pointData = pointDataFormatted[vectorIndex];
-                            int16_t pixelValContainingZ = rowPtr[col];
-                            pointData = (((uint64_t)(pixelValContainingZ) & 0xFFFF) << 32) | (((uint64_t)(col & 0xFFFF)) << 16) | ((uint64_t)(row & 0xFFFF)); 
+                            int16_t pixelValContainingZ = static_cast<int16_t>(zVal);
+                            pointData = (((uint64_t)(pixelValContainingZ) & 0xFFFF) << 32) | (((uint64_t)((col+1) & 0xFFFF)) << 16) | ((uint64_t)((row+1) & 0xFFFF)); 
                             vectorIndex++; 
+
+                            if (col+1 < 400 && row+1 < 400)
+                            {
+                                //triangle data by vertex id
+                                // [ current point , point to right ]
+                                // [ point below   , point diagonal ]
+                                // Triangels constructed counter clockwise for UE5
+                                Vec3i triangle = { vectorIndex,       vectorIndex + 400, vectorIndex + 1 };        // current point, point below, point to the right 
+                                Vec3i triangle2 = { vectorIndex + 400,  vectorIndex + 401, vectorIndex + 1 };      // point below, point diagonal, point to right
+                                triangelIDs.emplace_back(triangle);
+                                triangelIDs.emplace_back(triangle2);
+                            }
                         }
                     }
                 }
@@ -347,27 +370,43 @@ int main()
                 ofstream outCSV; 
                 outCSV.open("heightMapPointCloudData.xyz");
                 int pointCount = 0; 
-                std::cout << "[Information] \t \t About to parse point data to .xyz file. This will take a while..." << std::endl;
+                std::cout << "[Information] \t \t About to parse triangle data to .csv file. This will take a while..." << std::endl;
                 for (const uint64_t point : pointDataFormatted)
                 {
                     // decode the point values stored in the 64 bit integer
-                    uint16_t pointValues[3] = { (uint16_t)point & 0xFFFF, (uint16_t)((point >> 16) & 0xFFF), (uint16_t)((point >> 32) & 0xFFFF) };
+                    uint16_t pointValues[3] = { (uint16_t)point & 0xFFFF, (uint16_t)((point >> 16) & 0xFFFF), (uint16_t)((point >> 32) & 0xFFFF) };
 
                     // multiply x & y by 100 to set scale to 4000*4000 meters 
                     uint16_t coordinateX = pointValues[0] * 10; 
                     uint16_t coordinateY = pointValues[1] * 10; 
                     //for Z we convert the scale of 0-255 representing elvation to 0 - 1000m 
+
                     uint16_t coordinateZ = pointValues[2] * (1000/255); 
 
-                    outCSV << pointCount  << ",";  //ID for .xy file format needed for point clouod data
                     outCSV << coordinateX << ","; 
                     outCSV << coordinateY << ","; 
-                    outCSV << coordinateZ << ",";
+                    outCSV << coordinateZ;
                     outCSV << endl; 
 
                     pointCount++; 
                 }
                 outCSV.close(); 
+
+                ofstream outCSV2;
+                outCSV2.open("trianglePointIDs.csv");
+                int triangleCount = 0;
+                std::cout << "[Information] \t \t About to parse point data to .xyz file. This will take a while..." << std::endl;
+                for (const auto points : triangelIDs)
+                {
+                    outCSV2 << points[0] << ",";
+                    outCSV2 << points[1] << ",";
+                    outCSV2 << points[2];
+                    outCSV2 << endl;
+
+                    triangleCount++;
+                }
+                std::cout << "[Information] \t \t Triangles were added: " << triangleCount << std::endl;
+                outCSV2.close();
             }
         } 
         else
