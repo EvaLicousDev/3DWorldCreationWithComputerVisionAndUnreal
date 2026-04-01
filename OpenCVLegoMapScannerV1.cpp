@@ -9,10 +9,11 @@
 #include <filesystem>
 #include <memory>
 #include <map>
+#include <fstream>
 
 using namespace std;
 using namespace cv;
-using namespace PreProcessor;
+using namespace ImageProcessing;
 
 // Image directory defined in CMake Lists file
 static const std::string sc_imageFilesPattern = std::string(IMAGE_DIR) + "/*.jpg";
@@ -29,8 +30,10 @@ int main()
     
     //---------------------------------------------------------
     // Settings
-    bool demo = false; 
+    bool debugOrDemoAll = false; 
     bool resetLog = true; 
+    bool createHeightMapPNG = false;
+    const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png"; 
 
     //---------------------------------------------------------
     // Error log gets errased
@@ -51,7 +54,7 @@ int main()
     //Begin main processing loop - try and process an image and go to the next one if that fails
     for(auto imagePtr : images)
     {
-        demo = false; 
+        //demo = false; 
         if (auto strongPtr = imagePtr.lock())
         {
             cv::Mat imageToProcess = *strongPtr; 
@@ -65,8 +68,8 @@ int main()
             auto processor = ImageProcessor(imageToProcess);
             imageToProcess = processor.reseizeImage(imageToProcess);
 
-            if (demo) cv::imshow("currently processing this image", imageToProcess);
-            if (demo) cv::waitKey(0);
+            if (debugOrDemoAll) cv::imshow("currently processing this image", imageToProcess);
+            if (debugOrDemoAll) cv::waitKey(0);
 
             //---------------------------------------------------------
             //Find the inital region of interest with simple thresholding
@@ -85,8 +88,8 @@ int main()
             cv::Mat greenBlueHueAreas;
             imageToProcess.copyTo(greenBlueHueAreas, higherRedValueMask);
 
-            if (demo) imshow("Low Red Values Mask", greenBlueHueAreas);
-            if (demo) waitKey(0);
+            if (debugOrDemoAll) imshow("Low Red Values Mask", greenBlueHueAreas);
+            if (debugOrDemoAll) waitKey(0);
 
             // at this point, depending on the lighting, we still have a lot of black tray in our image
             // we now use the green channel to reduce the pixels evaluated for feature detection further
@@ -97,21 +100,21 @@ int main()
             cv::medianBlur(noLowGreenValuesMask, noLowGreenValuesMask, 9);
 
             cv::threshold(noLowGreenValuesMask, noLowGreenValuesMask, 50, 255, THRESH_BINARY);
-            if (demo) imshow("Green Channel value 50 - 255", noLowGreenValuesMask);
-            if (demo) waitKey(0);
+            if (debugOrDemoAll) imshow("Green Channel value 50 - 255", noLowGreenValuesMask);
+            if (debugOrDemoAll) waitKey(0);
 
             cv::Mat noLowRedGreen;
             greenBlueHueAreas.copyTo(noLowRedGreen, noLowGreenValuesMask);
             normalize(noLowRedGreen, noLowRedGreen, 0, 255, NORM_MINMAX); //improve uneven light conditions
 
-            if (demo) imshow("Presumed Green areas", noLowRedGreen);
-            if (demo) waitKey(0);
+            if (debugOrDemoAll) imshow("Presumed Green areas", noLowRedGreen);
+            if (debugOrDemoAll) waitKey(0);
 
             //---------------------------------------------------------
             // Find points to apply transform on ROI to offset the camera angle and distortion
             // For this we go over all the contours, create a bounding box around the largest
             // and use the center of said bounding box to find the outer corners of the lego plate
-            auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, demo, demo);
+            auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, debugOrDemoAll, debugOrDemoAll);
             auto plateRectangle = processor.getPlateRectangle();
             auto plate = plateRectangle.lock();
 
@@ -150,12 +153,12 @@ int main()
                 //make plate square now that we have the right area
                 resize(legoPlate, legoPlate, cv::Size(500, 500));
 
-                if (demo) cv::imshow("Corrected - should be \'straight\' lego plate for better coordinates.", legoPlate);
-                if (demo) cv::imshow("Bricks above board", exampleBricks);
-                if (demo) waitKey(0);
+                if (debugOrDemoAll) cv::imshow("Corrected - should be \'straight\' lego plate for better coordinates.", legoPlate);
+                if (debugOrDemoAll) cv::imshow("Bricks above board", exampleBricks);
+                if (debugOrDemoAll) waitKey(0);
 
                 //get the location of our example bricks for backprojection and template matching
-                auto bricks = processor.findBrickLocations(exampleBricks, demo);
+                auto bricks = processor.findBrickLocations(exampleBricks, debugOrDemoAll);
                 std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
                     {
                         return left.tl().x < right.tl().x;
@@ -239,7 +242,7 @@ int main()
                         processor.addToHeightMap(deepRivers); 
                     }
 
-                    if (demo)
+                    if (debugOrDemoAll)
                     {
                         cv::Mat leg;
                         legoPlate.copyTo(leg);
@@ -294,25 +297,77 @@ int main()
                 cv::Mat noiseAdded;
                 noiseZoom.copyTo(noiseAdded, tooHighAreas); 
                 cv::Mat out = dist * 0.5;
-                cv::GaussianBlur(dist, dist, cv::Size(15,15), 5, 5);
                 cv::add(out, noiseAdded, out);
+                out.convertTo(out, CV_64FC1, 255.0);
+                cv::GaussianBlur(out, out, cv::Size(15,15), 5, 5);
                 cv::normalize(out, out, 100, 250, NORM_MINMAX);
                 cv::resize(out, out, cv::Size(100,100));
-                out.convertTo(out, CV_64FC1, 255.0);
 
                 cv::GaussianBlur(out, out, cv::Size(15, 15), 50, 50);
                 resize(out, out, cv::Size(heightMap->cols, heightMap->rows));
                 cv::normalize(out, out, 0, 255, NORM_MINMAX);
-                out.convertTo(out, CV_16U, 255.0);
-                cv::medianBlur(out, out, 5);
 
-                demo = true; 
-                if (demo) cv::imshow("HeightMap", out);
-                if (demo) cv::waitKey(0);
+                if (debugOrDemoAll) resize(out, out, cv::Size(500,500));
+                if (debugOrDemoAll) cv::imshow("HeightMap", out);
+                if (debugOrDemoAll) cv::waitKey(0);
 
-                //convert to unreal engine height map format
-                cv::resize(out, out, cv::Size(sc_pixelsInHeightMap, sc_pixelsInHeightMap));
-                cv::imwrite("heightMap.png", out);
+                createHeightMapPNG = true; 
+                if (createHeightMapPNG) processor.createHeightMapPNG(out, heightMapOutputPath); 
+
+                // for terrain generation we test the .xyz file format (eporting as .csv first) and then 
+                // saving it as .xyz instead. This is so we can read it in as lidar point cloud for UE5 
+                // Writing the point cloud data is expensive and takes quite a while as we are transcribing 
+                // 4034*4034*4 values to a csv file. 
+
+                resize(out, out, cv::Size(400,400));
+                out.convertTo(out, CV_8UC1, 255.0); //convert back to values between 0 - 255 stored as Uchars
+                out.reshape(0, 400); //ensure image not continuous
+                auto pointDataFormatted = std::vector<uint64_t>(160000);
+                int vectorIndex = 0; 
+
+                auto rows = out.rows;
+                auto cols = out.cols;
+
+                if (out.channels() == 1)
+                {
+                    std::cout << "[Information] \t \t About to prepare point data. This will take a while..." << std::endl;
+                    for (int16_t row = 0; row < rows; row++)
+                    {
+                        uchar* rowPtr = out.ptr<uchar>(row);
+                        for (int16_t col = 0; col < cols; col++)
+                        {
+                            auto& pointData = pointDataFormatted[vectorIndex];
+                            int16_t pixelValContainingZ = rowPtr[col];
+                            pointData = (((uint64_t)(pixelValContainingZ) & 0xFFFF) << 32) | (((uint64_t)(col & 0xFFFF)) << 16) | ((uint64_t)(row & 0xFFFF)); 
+                            vectorIndex++; 
+                        }
+                    }
+                }
+
+                ofstream outCSV; 
+                outCSV.open("heightMapPointCloudData.xyz");
+                int pointCount = 0; 
+                std::cout << "[Information] \t \t About to parse point data to .xyz file. This will take a while..." << std::endl;
+                for (const uint64_t point : pointDataFormatted)
+                {
+                    // decode the point values stored in the 64 bit integer
+                    uint16_t pointValues[3] = { (uint16_t)point & 0xFFFF, (uint16_t)((point >> 16) & 0xFFF), (uint16_t)((point >> 32) & 0xFFFF) };
+
+                    // multiply x & y by 100 to set scale to 4000*4000 meters 
+                    uint16_t coordinateX = pointValues[0] * 10; 
+                    uint16_t coordinateY = pointValues[1] * 10; 
+                    //for Z we convert the scale of 0-255 representing elvation to 0 - 1000m 
+                    uint16_t coordinateZ = pointValues[2] * (1000/255); 
+
+                    outCSV << pointCount  << ",";  //ID for .xy file format needed for point clouod data
+                    outCSV << coordinateX << ","; 
+                    outCSV << coordinateY << ","; 
+                    outCSV << coordinateZ << ",";
+                    outCSV << endl; 
+
+                    pointCount++; 
+                }
+                outCSV.close(); 
             }
         } 
         else

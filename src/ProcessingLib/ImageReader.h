@@ -6,7 +6,7 @@
 #include <opencv2/core.hpp>
 
 using namespace Errors; 
-namespace PreProcessor
+namespace ImageProcessing
 {
     class ImageReader
     {

@@ -24,7 +24,7 @@ static constexpr size_t redOrBlueYellow = 2;
 
 static constexpr size_t approximateLegoKnobPixels = 16;
 
-namespace PreProcessor
+namespace ImageProcessing
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
@@ -77,6 +77,7 @@ namespace PreProcessor
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
         cv::Rect findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
         std::vector<cv::Rect> findBrickLocations(cv::Mat& brickArea, bool showResult = false); 
+        cv::Mat createHeightMapPNG(cv::Mat& heightMapData, const char* heightmapOutputPath); 
 
         cv::Point2f findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);

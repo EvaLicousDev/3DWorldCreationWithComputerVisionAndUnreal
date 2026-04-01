@@ -318,7 +318,7 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvHUEMat(const cv::Mat& labACha
     {
         auto labAPx = labA.ptr<float>(rowIndex);
         auto labBPx = labB.ptr<float>(rowIndex);
-        auto outPx = outMask.ptr<float>(rowIndex);
+        auto outPx = outMask.ptr<double>(rowIndex);
 
         for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
         {

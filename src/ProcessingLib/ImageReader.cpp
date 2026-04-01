@@ -6,7 +6,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-std::vector<std::weak_ptr<cv::Mat>> PreProcessor::ImageReader::getImages()
+std::vector<std::weak_ptr<cv::Mat>> ImageProcessing::ImageReader::getImages()
 {
     if (images.empty())
     {
@@ -23,7 +23,7 @@ std::vector<std::weak_ptr<cv::Mat>> PreProcessor::ImageReader::getImages()
     return outvector;
 }
 
-void PreProcessor::ImageReader::readImages(const char* imagesPath)
+void ImageProcessing::ImageReader::readImages(const char* imagesPath)
 {
     //get all filenames for a specified pattern 
     cv::String folderpath = imagesPath; 

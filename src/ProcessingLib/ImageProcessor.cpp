@@ -1,5 +1,6 @@
 #include "ImageProcessor.h"
 #include "ImageProcessor.h"
+#include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
 #include "ERRORs/ErrorOutput.h"
 #include "Histogram/ColourHistogram.h"
@@ -14,12 +15,12 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 
-void PreProcessor::ImageProcessor::setWhiteBrick(cv::Mat& image)
+void ImageProcessing::ImageProcessor::setWhiteBrick(cv::Mat& image)
 {
     whiteBrick = std::make_shared<cv::Mat>(image);
 }
 
-void PreProcessor::ImageProcessor::addToHeightMap(const cv::Mat& info)
+void ImageProcessing::ImageProcessor::addToHeightMap(const cv::Mat& info)
 {
     //for a 4km x 4km map we need 4000 x 4000 px in unreal: we use 1px for 1 m^2
     cv::Mat infoReshaped;
@@ -38,17 +39,17 @@ void PreProcessor::ImageProcessor::addToHeightMap(const cv::Mat& info)
     }
 }
 
-void PreProcessor::ImageProcessor::setImageOfLego(cv::Mat& image)
+void ImageProcessing::ImageProcessor::setImageOfLego(cv::Mat& image)
 {
     imageOfLego = std::make_shared<cv::Mat>(image); 
 }
 
-void PreProcessor::ImageProcessor::setImageOfBricks(cv::Mat& image)
+void ImageProcessing::ImageProcessor::setImageOfBricks(cv::Mat& image)
 {
     imageOfBricks = std::make_shared<cv::Mat>(image);
 }
 
-std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& brickArea, bool showResult /* = false */)
+std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Mat& brickArea, bool showResult /* = false */)
 {
     auto demo = showResult; 
     cv::Mat brickAreaCopy; 
@@ -124,7 +125,16 @@ std::vector<cv::Rect> PreProcessor::ImageProcessor::findBrickLocations(cv::Mat& 
     return bricks; 
 }
 
-void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool drawContours)
+// Uses cv::Mat reference to resize to sc_pixelsHeightMap^2 and then converts to Uint 16 type image, then outputs "heightMap.png" and returns cv::Mat if needed.
+cv::Mat ImageProcessing::ImageProcessor::createHeightMapPNG(cv::Mat& heightMapData, const char* heightMapOutPutPath)
+{
+    cv::resize(heightMapData, heightMapData, cv::Size(sc_pixelsInHeightMap, sc_pixelsInHeightMap));
+    heightMapData.convertTo(heightMapData, CV_16U, 255.0); //Desired file format for heightmaps for UE5 editor landscape system
+    cv::imwrite(heightMapOutPutPath, heightMapData);
+    return heightMapData;
+}
+
+void ImageProcessing::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool drawContours)
 {
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(allEdgesAdded, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
@@ -147,7 +157,7 @@ void PreProcessor::ImageProcessor::getContourData(cv::Mat& allEdgesAdded, bool d
     this->m_contours = std::make_shared<std::vector<std::vector<cv::Point>>>(contours);
 }
 
-cv::Rect PreProcessor::ImageProcessor::findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner) {
+cv::Rect ImageProcessing::ImageProcessor::findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner) {
     cv::Rect longestSideRect;
     int maxSide = 0;
 
@@ -167,7 +177,7 @@ cv::Rect PreProcessor::ImageProcessor::findRectWithLongestSide(const std::vector
 }
 
 
-cv::Rect PreProcessor::ImageProcessor::findRectWithLargestVolium(const std::vector<cv::Rect>& boxes) {
+cv::Rect ImageProcessing::ImageProcessor::findRectWithLargestVolium(const std::vector<cv::Rect>& boxes) {
     cv::Rect greatestVolium;
     int maxVol = 0;
 
@@ -185,7 +195,7 @@ cv::Rect PreProcessor::ImageProcessor::findRectWithLargestVolium(const std::vect
 }
 
 //returns 0 area Rect if no bounding box is roughly square
-cv::Rect PreProcessor::ImageProcessor::findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes) {
+cv::Rect ImageProcessing::ImageProcessor::findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes) {
     auto greatestVolium = cv::Rect(0,0,0,0);
     int maxVolium = 0; 
 
@@ -202,7 +212,7 @@ cv::Rect PreProcessor::ImageProcessor::findLargestVoliumSquareContour(std::vecto
 }
 
 //returns 0 area Rect if not squarish
-cv::Rect PreProcessor::ImageProcessor::findSquareIsh(const std::vector<cv::Point>& box)
+cv::Rect ImageProcessing::ImageProcessor::findSquareIsh(const std::vector<cv::Point>& box)
 {
     auto rect = cv::boundingRect(box);
     double aspectRatio = static_cast<double>(rect.width) / static_cast<double>(rect.height);
@@ -216,7 +226,7 @@ cv::Rect PreProcessor::ImageProcessor::findSquareIsh(const std::vector<cv::Point
 
 
 
-cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool showAreas /* = false */)
+cv::Mat ImageProcessing::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool showAreas /* = false */)
 {
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
@@ -244,7 +254,7 @@ cv::Mat PreProcessor::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool s
 }
 
 // custom way of adding the contours and colour channel to create a map 
-cv::Mat PreProcessor::ImageProcessor::createMapWithContoursAndLABchannel(const cv::Mat& labChannel, const cv::Mat& mser)
+cv::Mat ImageProcessing::ImageProcessor::createMapWithContoursAndLABchannel(const cv::Mat& labChannel, const cv::Mat& mser)
 {
     if (labChannel.rows != mser.rows || labChannel.cols != mser.cols)
     {
@@ -287,7 +297,7 @@ cv::Mat PreProcessor::ImageProcessor::createMapWithContoursAndLABchannel(const c
     return outMask; 
 }
 
-cv::Rect PreProcessor::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask /* = false */, bool showAllRect /* = false */) {
+cv::Rect ImageProcessing::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask /* = false */, bool showAllRect /* = false */) {
 
     cv::Mat legoPixMask;
     cv::Mat copy; 
@@ -334,7 +344,7 @@ cv::Rect PreProcessor::ImageProcessor::findLegoWithThresholdingMask(cv::Mat imag
 // Theory - find contours RETR_TREE outputs a hirarchy. We want to find the inside elements on the black tray. Therefor we are looking for
 //         the largest square shaped contour on level 1 with children
 // For more informations on how hirarchy is structured, please visit "https://docs.opencv.org/3.4/d9/d8b/tutorial_py_contours_hierarchy.html"
-cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
+cv::Rect ImageProcessing::ImageProcessor::findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
 {
     auto outRect = cv::Rect(0, 0, 0, 0);
 
@@ -388,7 +398,7 @@ cv::Rect PreProcessor::ImageProcessor::findLargestVoliumChild(std::vector<cv::Ve
     return outRect;
 }
 
-cv::Rect PreProcessor::ImageProcessor::findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult)
+cv::Rect ImageProcessing::ImageProcessor::findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult)
 {
     auto outRect = cv::Rect(0, 0, 0, 0);
     for (int parentIdx(0); parentIdx >= 0; parentIdx = hierarchy[parentIdx][NEXT_SIBLING])
@@ -432,7 +442,7 @@ cv::Rect PreProcessor::ImageProcessor::findChildCorners(int largestVoliumIndex, 
     return outRect;
 }
 
-void PreProcessor::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
+void ImageProcessing::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
 {
     auto outRect = cv::Rect(0, 0, 0, 0);
 
@@ -485,7 +495,7 @@ void PreProcessor::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv:
 * We take all of the contours, find the biggest one, and **ASSUME** it roughly covers the lego plate if we create a bounding rectangle around it.
 * We then create a center point, and use basic trigonomitry to find the best match for corners of the lego plate 
 */
-std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(cv::Mat original, cv::Mat& greyScaleGreenChannel, bool showBlackMask /* = false */, bool showAllRect /* = false */) 
+std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorners(cv::Mat original, cv::Mat& greyScaleGreenChannel, bool showBlackMask /* = false */, bool showAllRect /* = false */) 
 {
     cv::Mat orig;
     if (showAllRect)
@@ -637,7 +647,7 @@ std::vector<cv::Point2f> PreProcessor::ImageProcessor::useContoursToFindCorners(
     return std::vector<cv::Point2f>();
 }
 
-cv::Point2f PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f ImageProcessing::ImageProcessor::findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be smaller and y has to be smaller, and distance to middle maximised
     double distanceSquared = 0; 
@@ -662,7 +672,7 @@ cv::Point2f PreProcessor::ImageProcessor::findTL(std::vector<std::vector<cv::Poi
     return out; 
 }
 
-cv::Point2f PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f ImageProcessing::ImageProcessor::findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be bigger and y has to be smaller, and distance to middle maximised
     double distanceSquared = 0;
@@ -687,7 +697,7 @@ cv::Point2f PreProcessor::ImageProcessor::findTR(std::vector<std::vector<cv::Poi
     return out;
 }
 
-cv::Point2f PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f ImageProcessing::ImageProcessor::findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be smaller and y has to be bigger, and distance to middle maximised
     double distanceSquared = 0;
@@ -712,7 +722,7 @@ cv::Point2f PreProcessor::ImageProcessor::findBL(std::vector<std::vector<cv::Poi
     return out;
 }
 
-cv::Point2f PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
+cv::Point2f ImageProcessing::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
     //x has to be sigger and y has to be bigger, and distance to middle maximised
     double distanceSquared = 0;
@@ -741,7 +751,7 @@ cv::Point2f PreProcessor::ImageProcessor::findBR(std::vector<std::vector<cv::Poi
  * This function capitalises of the base plate being green and still works well in low light with harsh shadows
  * If it fails we want to request another image from the camera
  */
-cv::Rect PreProcessor::ImageProcessor::getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult)
+cv::Rect ImageProcessing::ImageProcessor::getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult)
 {
     cv::Mat channels[3];
     split(unprocessedROI, channels);
@@ -784,7 +794,7 @@ cv::Rect PreProcessor::ImageProcessor::getPlateWithGreenChannel(cv::Mat unproces
 }
 
 //TO DO: check y values
-bool PreProcessor::ImageProcessor::isWithinTollerance(cv::Rect& output)
+bool ImageProcessing::ImageProcessor::isWithinTollerance(cv::Rect& output)
 {
     // check if result width is within reasonable distance to right most and left most corners
     // we know:
@@ -817,7 +827,7 @@ bool PreProcessor::ImageProcessor::isWithinTollerance(cv::Rect& output)
     }
 }
 
-void PreProcessor::ImageProcessor::setContouringThresholds(cv::Mat& blurredGreyscale)
+void ImageProcessing::ImageProcessor::setContouringThresholds(cv::Mat& blurredGreyscale)
 {
     normalize(blurredGreyscale, blurredGreyscale, 0, 255, cv::NORM_MINMAX);
     cv::minMaxIdx(blurredGreyscale, &controurThreshMin, &controurThreshMax, 0, 0);
@@ -828,7 +838,7 @@ void PreProcessor::ImageProcessor::setContouringThresholds(cv::Mat& blurredGreys
     double minThreshCan = maxThreshCan * 0.9;
 }
 
-cv::Mat PreProcessor::ImageProcessor::applyCannyToBGR(cv::Mat& blurredBGR)
+cv::Mat ImageProcessing::ImageProcessor::applyCannyToBGR(cv::Mat& blurredBGR)
 {
     cv::Mat blurredGreyscale; 
     cv::cvtColor(blurredBGR, blurredGreyscale, cv::COLOR_BGR2GRAY); 
@@ -837,14 +847,14 @@ cv::Mat PreProcessor::ImageProcessor::applyCannyToBGR(cv::Mat& blurredBGR)
     return blurredGreyscale; 
 }
 
-cv::Mat PreProcessor::ImageProcessor::applyCannyTo1D(cv::Mat& blurredGrey, int threshold)
+cv::Mat ImageProcessing::ImageProcessor::applyCannyTo1D(cv::Mat& blurredGrey, int threshold)
 {
     setContouringThresholds(blurredGrey);
     cv::Canny(blurredGrey, blurredGrey, threshold, controurThreshMax);
     return blurredGrey;
 }
 
-cv::Mat PreProcessor::ImageProcessor::applySobel(cv::Mat& mask, int k)
+cv::Mat ImageProcessing::ImageProcessor::applySobel(cv::Mat& mask, int k)
 {
     cv::Mat sobelx, sobely, gradient;
     cv::Sobel(mask, sobelx, CV_64F, 1, 0, k);
@@ -855,7 +865,7 @@ cv::Mat PreProcessor::ImageProcessor::applySobel(cv::Mat& mask, int k)
     return gradient;
 }
 
-cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
+cv::Mat ImageProcessing::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
 {
     //convert input image and ROI to lab and split channels
     //we seperate out the A & B channel
@@ -919,7 +929,7 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogram(cv::Mat& inputImage, 
     return cv::Mat(); 
 }
 
-cv::Mat PreProcessor::ImageProcessor::backprojectHistogramHSV(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
+cv::Mat ImageProcessing::ImageProcessor::backprojectHistogramHSV(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold)
 {
     //convert input image and ROI to lab and split channels
     //we seperate out the A & B channel
@@ -959,7 +969,7 @@ cv::Mat PreProcessor::ImageProcessor::backprojectHistogramHSV(cv::Mat& inputImag
     return cv::Mat();
 }
 
-cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
+cv::Mat ImageProcessing::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
 {
     cv::Mat greyScale; 
     cv::GaussianBlur(greyImage, greyScale, cv::Size(), 1.4);
@@ -968,7 +978,7 @@ cv::Mat PreProcessor::ImageProcessor::createThresholdMask(cv::Mat& greyImage)
 }
 
 //resizes large images to the vertical size of 50 pxls
-cv::Mat PreProcessor::ImageProcessor::reseizeImage(cv::Mat& image)
+cv::Mat ImageProcessing::ImageProcessor::reseizeImage(cv::Mat& image)
 {
     auto numVerticalPixl = image.rows;
     auto desiredSizeFactorVertical = numVerticalPixl / 500;
@@ -983,7 +993,7 @@ cv::Mat PreProcessor::ImageProcessor::reseizeImage(cv::Mat& image)
     return image;
 }
 
-cv::Mat PreProcessor::ImageProcessor::thresholdColourOnChannel(cv::Mat channel, int lowerBound, int upperBound, const char* frameName, bool showImage /*= false */)
+cv::Mat ImageProcessing::ImageProcessor::thresholdColourOnChannel(cv::Mat channel, int lowerBound, int upperBound, const char* frameName, bool showImage /*= false */)
 {
     cv::Mat output; 
     cv::threshold(channel,output, lowerBound, upperBound, cv::NORM_MINMAX);
@@ -993,7 +1003,7 @@ cv::Mat PreProcessor::ImageProcessor::thresholdColourOnChannel(cv::Mat channel, 
 }
 
 // Dev function
-void PreProcessor::ImageProcessor::debugInfo(cv::Mat& image)
+void ImageProcessing::ImageProcessor::debugInfo(cv::Mat& image)
 {
     std::cout << "image channels: "   << image.channels() << std::endl;
     std::cout << "image cols: "       << image.cols << std::endl;
@@ -1002,7 +1012,7 @@ void PreProcessor::ImageProcessor::debugInfo(cv::Mat& image)
 }
 
 // Sharpen edges
-cv::Mat PreProcessor::ImageProcessor::sharpen2Dedges(cv::Mat& image)
+cv::Mat ImageProcessing::ImageProcessor::sharpen2Dedges(cv::Mat& image)
 {
     //The kernal determines by how much the surrounding neighbour values will be adjusted to achieve sharpened appearance
     cv::Mat kernel(3, 3, CV_32F, cv::Scalar(0));
@@ -1020,7 +1030,7 @@ cv::Mat PreProcessor::ImageProcessor::sharpen2Dedges(cv::Mat& image)
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
-cv::Mat PreProcessor::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& image, int divideBy)
+cv::Mat ImageProcessing::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& image, int divideBy)
 {
     auto it = image.begin<cv::Vec3b>();
     for (; it != image.end<cv::Vec3b>(); it++)
@@ -1033,7 +1043,7 @@ cv::Mat PreProcessor::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& ima
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
-cv::Mat PreProcessor::ImageProcessor::naiveRgbColourSpaceReduction(cv::Mat& image, int divideBy)
+cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction(cv::Mat& image, int divideBy)
 {
     auto rows = image.rows;
     auto cols = image.channels() * image.cols;
@@ -1060,7 +1070,7 @@ cv::Mat PreProcessor::ImageProcessor::naiveRgbColourSpaceReduction(cv::Mat& imag
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
-cv::Mat PreProcessor::ImageProcessor::naiveRgbColourSpaceReduction2(cv::Mat& image, int divideBy)
+cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction2(cv::Mat& image, int divideBy)
 {
     auto rows = image.rows;
     auto cols = image.channels() * image.cols;
@@ -1087,7 +1097,7 @@ cv::Mat PreProcessor::ImageProcessor::naiveRgbColourSpaceReduction2(cv::Mat& ima
 }
 
 // returns copy of image passed in with pixel values devided to fit desired colour space 
-cv::Mat PreProcessor::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy)
+cv::Mat ImageProcessing::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy)
 {
     auto rows = image.rows;
     auto cols = image.channels() * image.cols;
@@ -1118,7 +1128,7 @@ cv::Mat PreProcessor::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& im
 
 // Function returns the absolute value between the three colour channels in a Vec3b object
 // Function taken from OpenCV 4 cookbook
-int PreProcessor::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const
+int ImageProcessing::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const
 {
     return abs(colourIn[0] - tragetColour[0])
          + abs(colourIn[1] - tragetColour[1])

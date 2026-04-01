@@ -3,7 +3,7 @@
 #include <iostream>
 #include <opencv2/highgui.hpp>
 
-void PreProcessor::ColourSpaceVisualiser::updateHSVChannelsWithProcessed(cv::Mat& processed)
+void ImageProcessing::ColourSpaceVisualiser::updateHSVChannelsWithProcessed(cv::Mat& processed)
 {
     std::vector<cv::Mat> rgb_channels;
     cv::split(processed, rgb_channels);
@@ -38,7 +38,7 @@ void PreProcessor::ColourSpaceVisualiser::updateHSVChannelsWithProcessed(cv::Mat
     image_V = luv_channels[2];
 }
 
-void PreProcessor::ColourSpaceVisualiser::displayHSVChannels()
+void ImageProcessing::ColourSpaceVisualiser::displayHSVChannels()
 {
     if (!this->imageOfLego.empty())
     {
@@ -70,7 +70,7 @@ void PreProcessor::ColourSpaceVisualiser::displayHSVChannels()
 }
 
 
-void PreProcessor::ColourSpaceVisualiser::displayLABChannels()
+void ImageProcessing::ColourSpaceVisualiser::displayLABChannels()
 {
     if (!this->imageOfLego.empty())
     {
@@ -102,7 +102,7 @@ void PreProcessor::ColourSpaceVisualiser::displayLABChannels()
 }
 
 
-void PreProcessor::ColourSpaceVisualiser::displayLUVChannels()
+void ImageProcessing::ColourSpaceVisualiser::displayLUVChannels()
 {
     if (!this->imageOfLego.empty())
     {
@@ -132,7 +132,7 @@ void PreProcessor::ColourSpaceVisualiser::displayLUVChannels()
     }
 }
 
-void PreProcessor::ColourSpaceVisualiser::displayRGBChannels()
+void ImageProcessing::ColourSpaceVisualiser::displayRGBChannels()
 {
     if (!this->imageOfLego.empty())
     {
@@ -163,7 +163,7 @@ void PreProcessor::ColourSpaceVisualiser::displayRGBChannels()
 }
 
 // Displays copy of image reference resized 
-void PreProcessor::ColourSpaceVisualiser::display(cv::Mat& image, const char* displayName, int pixels)
+void ImageProcessing::ColourSpaceVisualiser::display(cv::Mat& image, const char* displayName, int pixels)
 {
     if (!this->imageOfLego.empty())
     {
@@ -183,7 +183,7 @@ void PreProcessor::ColourSpaceVisualiser::display(cv::Mat& image, const char* di
 }
 
 // Displays image reference. By defualt it sizes the picture down to 65% of it's original size. This can be toggled off by pasig in "false"
-void PreProcessor::ColourSpaceVisualiser::display(const cv::Mat& image, const char* displayName, bool sizeDown /* = true */)
+void ImageProcessing::ColourSpaceVisualiser::display(const cv::Mat& image, const char* displayName, bool sizeDown /* = true */)
 {
     cv::namedWindow(displayName);
     if (sizeDown)

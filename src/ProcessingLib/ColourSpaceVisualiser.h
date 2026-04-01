@@ -13,7 +13,7 @@
 
 #include "ERRORs/ErrorOutput.h"
 
-namespace PreProcessor
+namespace ImageProcessing
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
