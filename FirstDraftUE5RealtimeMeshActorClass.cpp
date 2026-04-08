@@ -1,3 +1,5 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
 #include "ACPP_RuntimeTerrain.h"
 #include "RealtimeMeshSimple.h"
 
@@ -25,7 +27,7 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 {
 	//M_fileLines.Reset(); 
 	M_pointData.Reset();
-	M_pointBuilderID.Reset(); 
+	M_pointBuilderID.Reset();
 	M_pointLogged.Reset();
 	M_triangles.Reset(); 
 
@@ -46,8 +48,8 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Purple, message);
 
 		    message = FString(TEXT("Memory for structs in bytes [Triangesls | Points] : [ "));
-			auto triangleCount = M_triangles.GetAllocatedSize();
-			auto pointCount = M_pointData.GetAllocatedSize();
+		    triangleCount = M_triangles.GetAllocatedSize();
+		    pointCount = M_pointData.GetAllocatedSize();
 			message += FString::FromInt(triangleCount);
 			message += TEXT(" | ");
 			message += FString::FromInt(pointCount);
@@ -62,8 +64,7 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 
 	// We iterate over triangles to get the data we need for the mesh as the context is important
 	int quadCount = 0; 
-	auto iter = M_triangles.begin(); 
-	for (iter; iter != M_triangles.end(); iter++)
+	for (int triangs = 0; triangs < M_triangles.Num(); triangs++)
 	{
 		TRealtimeMeshBuilderLocal<uint16, FPackedNormal, FVector2DHalf, 1> Builder(StreamSet);
 
@@ -73,11 +74,11 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 		Builder.EnablePolyGroups();
 
 		// We have 2 triangles in the poly group of a quad
-		const auto triangle1 = *iter; 
-		const auto triangle2 = *(++iter);
+		const auto triangle1 = M_triangles[triangs++];
+		const auto triangle2 = M_triangles[triangs];
 
-		AddDataToMeshBuilder(&Builder, triangle1, quadCount);
-		AddDataToMeshBuilder(&Builder, triangle2, quadCount);
+		AddDataToMeshBuilder(Builder, triangle1, quadCount);
+		AddDataToMeshBuilder(Builder, triangle2, quadCount);
 
 		FString quadName = TEXT("Quad_"); 
 		quadName += FString::FromInt(quadCount); 
@@ -93,6 +94,17 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 		}
 
 		quadCount++; 
+	}
+
+	if (OnScreenDebugMessages)
+	{
+		if (GEngine)
+		{
+			auto info = FString(TEXT("INFORMATION: "));
+			info += FString::FromInt(quadCount); 
+			info += TEXT(" Quads were created");
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, info);
+		}
 	}
 }
 
@@ -176,7 +188,7 @@ void ACPP_RuntimeTerrain::AddDataToMeshBuilder(TRealtimeMeshBuilderLocal<uint16,
 		{
 			if (GEngine)
 			{
-				auto error = FString(TEXT("ERROR: point data for point not initialised!"));
+				auto error = FString(TEXT("FATAL ERROR : point data for point not initialised!"));
 				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
 			}
 		}
@@ -188,17 +200,17 @@ void ACPP_RuntimeTerrain::AddDataToMeshBuilder(TRealtimeMeshBuilderLocal<uint16,
 	FVector2f positionA, positionB, positionC; // XY / UV coordinates
 
 	//Get normals and tangents - https://forums.unrealengine.com/t/creating-the-tangentx-tangenty-tangentz-from-vertex-and-normal/308424/4
-	FVector Edge1 = pointB->point - pointA->point;
-	FVector Edge2 = pointC->point - pointA->point;
+	FVector Edge1 = { (pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]), (pointB->point[2] - pointA->point[2]) };
+	FVector Edge2 = { (pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]), (pointC->point[2] - pointA->point[2]) };
 	auto dUV1 = FVector2f((pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]));
 	auto dUV2 = FVector2f((pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]));
 	float tangentFactor = 1.0 / (dUV1[0] * dUV2[1] - dUV1[1] * dUV2[0]);
 
 	FVector   NormalVector = FVector::CrossProduct(Edge1, Edge2).GetSafeNormal(); 
 	FVector3f Tangents{
-		tangentFactor * (dUV2[1] * Edge1[0] - dUV1[1] * Edge2[0]),
-		tangentFactor * (dUV2[1] * Edge1[1] - dUV1[1] * Edge2[1]),
-		tangentFactor * (dUV2[1] * Edge1[2] - dUV1[1] * Edge2[2])
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[0] - (float)dUV1[1] * (float)Edge2[0])),
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[1] - (float)dUV1[1] * (float)Edge2[1])),
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[2] - (float)dUV1[1] * (float)Edge2[2]))
 	};
 
 	NormalVector.Normalize(); 
@@ -257,7 +269,7 @@ void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& v
 		auto coord = point->point;
 		vertex = FVector3f(coord);
 		uv = FVector2f(vertex[0], vertex[1]); //Investigate: Add world offset
-		FVector3f normals{ Normals[0], Normals[1], Normals[2]};
+		FVector3f normals{ (float)Normals[0], (float)Normals[1], (float)Normals[2]};
 
 		builderID = BuilderRef.AddVertex(vertex)
 			.SetNormalAndTangent(normals, Tangents)
@@ -266,8 +278,19 @@ void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& v
 
 		//let us know we added this vertex to the builder
 		M_pointBuilderID.Emplace(pointKey, builderID);
-
-	} //TO DO: Error logging
+		return; 
+	}
+	else
+	{
+		if (OnScreenDebugMessages) //fatal error
+		{
+			if (GEngine)
+			{
+				auto error = FString(TEXT("FATAL ERROR: pointKey was not found in builderID map"));
+				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
+			}
+		}
+	}
 }
 
 //Assumes data in csv file is singel comma sperated line
@@ -278,9 +301,9 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 	filehelper.LoadFileToString(M_dataString, *(FPaths::ProjectConfigDir() + csvFilePath));
 	FString deliminator = TEXT(",");
 
-	int indexX  = 0;
-	int indexY  = 0;
-	int pointID = 0;
+	int indexX  = 0.0;
+	int indexY  = 0.0;
+	double pointID = 0.0;
 
 	// the CV application parses out the z values to a .csv file only for a 400 x 400 px image
 	if (M_dataString.IsEmpty())
@@ -298,22 +321,21 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 
 	TArray<FString, FDefaultAllocator> xyz;
 	M_dataString.ParseIntoArray(xyz, TEXT(","), true);
-
-	for (const auto& coordinateAsString : xyz)
+	for (int indexOfYValue = 0; indexOfYValue < xyz.Num(); indexOfYValue++)
 	{
-		//////////////////////////////////////////////////// <------------------------------------------Correct reading out of data here !!
-		auto Scale = 10.0; //100 unreal units is rougly 1m 
-
 		FInternalPointData point;
 		pointID = indexX + indexY;
-		point.point[0] = indexX * Scale; 
+		point.point[0] = indexX * Scale;
 		point.point[1] = indexY * Scale;
-		point.point[2] = (FCString::Atoi(*coordinateAsString) * Scale);
+		point.point[2] = (FCString::Atoi(*xyz[indexOfYValue]) * Scale);
 
+		if (OnScreenDebugMessages)
+		{
+			FVector center{ point.point[0], point.point[1], point.point[2] };
+			DrawDebugSphere(GetWorld(), center, 25.0f, 16, FColor::Red, true);
+		}
 
-		//make coordinates visible for debug
-		DrawDebugSphere(GetWorld(), point.point, 25.0f, 16, FColor::Red, true);
-
+		// Recreate the image dimensions 
 		if (indexX < 399)
 		{
 			indexX++;
@@ -324,8 +346,8 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 			indexY++;
 		}
 
-		M_pointData.EmplaceByHash(pointID, point);
-		M_pointLogged.EmplaceByHash(pointID, false);
+		M_pointData.Emplace(pointID, point);
+		M_pointLogged.Emplace(pointID, false);
 	}
 }
 
@@ -346,11 +368,20 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 	int index3 = 400; 
 	int index4 = 401;
 
+	if (M_pointData.Num() != 160000)
+	{
+		if (GEngine)
+		{
+			auto error = FString(TEXT("IMPORTANT ERROR: The number of points allocated during the reading of the CSV is incorrect!"));
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
+		}
+	}
+
 	if (!M_pointData.IsEmpty())
 	{
-		for (int col = 0; col < 399; col++)
+		for (int col = 0; col < 398; col++)
 		{
-			for (int row = 0; row < 399; row++)
+			for (int row = 0; row < 398; row++)
 			{
 				index1 = row + col;
 				if (index1 < (160000 - 400))
