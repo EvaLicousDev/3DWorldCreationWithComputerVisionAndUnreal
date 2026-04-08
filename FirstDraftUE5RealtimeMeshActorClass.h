@@ -1,3 +1,5 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -16,7 +18,7 @@ struct FInternalPointData
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Point")
-	FVector point; 
+	FVector3f point; 
 };
 
 USTRUCT(BlueprintType, Category="InternalTriangleData")
@@ -26,7 +28,7 @@ struct FInternalTriangleData
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Triangle")
-	FVector triangleVertexIDs;
+	FVector3f triangleVertexIDs;
 };
 
 UCLASS(Blueprintable)
@@ -55,6 +57,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category="CSV_POINTS_FILEPATH")
 	FString csvFilePath{ TEXT("")};
+
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "ScaleBetweenPoints")
+	double Scale{10.0}; 
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category="Show_DEBUG_MESSAGES")
 	bool OnScreenDebugMessages = false; 
@@ -87,7 +92,7 @@ protected:
 		int32&        builderID
 	);
 
-	virtual void GetPointDataFromCsvParseArray();
+	//virtual void GetPointDataFromCsvParseArray();
 	virtual void MakeTriangles();
 	virtual void PopulateRealtimeMeshSection(); 
 
