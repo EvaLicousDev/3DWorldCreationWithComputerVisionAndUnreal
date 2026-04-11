@@ -5,6 +5,7 @@
 #include "src/ProcessingLib/BrickColourClassifier.h"
 #include "src/ProcessingLib/ColourDetector.h"
 #include "src/ProcessingLib/ImageReader.h"
+#include "src/ProcessingLib/Tests/CVAppOutputTester.h"
 
 #include <filesystem>
 #include <memory>
@@ -322,8 +323,13 @@ int main()
                 // Writing the point cloud data is expensive and takes quite a while as we are transcribing 
                 // 4034*4034*4 values to a csv file. 
 
-                resize(out, out, cv::Size(400,400));
+                int outRowsCols = 40; 
+                int pixelNum = outRowsCols * outRowsCols; 
+
+                resize(out, out, cv::Size(outRowsCols,outRowsCols));
                 out.convertTo(out, CV_8UC1); //convert back to values between 0 - 255 stored as Uchars
+
+                /*
                 out.reshape(0, 400); //ensure image not continuous
                 auto pointDataFormatted = std::vector<uint64_t>(160000);
                 auto triangelIDs = std::vector<Vec3i>(); 
@@ -335,7 +341,6 @@ int main()
                 //get triangles data by itterating with 4 px window
                 auto fourPixels = cv::Rect(0, 0, 2, 2); 
 
-                
                 //generating vertex data
                 if (out.channels() == 1)
                 {
@@ -366,11 +371,65 @@ int main()
                         }
                     }
                 }
+                */
 
+                out.reshape(0, 400); //ensure image not continuous
+                auto pointData = std::vector<uint8_t>(pixelNum);
+                int vectorIndex = 0;
+
+                auto rows = out.rows;
+                auto cols = out.cols;
+
+                //generating vertex data
+                if (out.channels() == 1)
+                {
+                    std::cout << "[Information] \t \t About to prepare point data. This will take a while..." << std::endl;
+                    for (int16_t row = 0; row < rows; row++)
+                    {
+                        uchar* rowPtr = out.ptr<uchar>(row);
+                        for (int16_t col = 0; col < cols; col++)
+                        {
+                            //vertex data
+                            auto zVal = rowPtr[col];
+                            auto& pointVal = pointData[vectorIndex];
+                            uint8_t pixelValContainingZ = static_cast<uint8_t>(zVal);
+                            pointVal = pixelValContainingZ; 
+
+                            vectorIndex++;
+                        }
+                    }
+                }
+
+                ofstream outCSV;
+                const char* outputfileName = "heightMapPoints.csv"; 
+                outCSV.open(outputfileName);
+                int pointCount = 0;
+                std::cout << "[Information] \t \t About to parse triangle data to .csv file. This will take a while..." << std::endl;
+
+                for (const uint8_t point : pointData)
+                {
+                    outCSV << point;
+                    if (pointCount < (pixelNum-1)) outCSV << ",";
+                    pointCount++;
+                }
+                outCSV.close();
+                
+                std::cout << "[INFORMATION] \t \t CSV File contains " << pointCount << " Z coordinates. Should be " << pixelNum << std::endl; 
+
+                //TEST CSV reading
+                bool testCSV = true; 
+                if (testCSV)
+                {
+                    legoCVTests::CVAppOutputTester::testCSVOutput(outputfileName);
+                }
+
+                /*
                 ofstream outCSV; 
-                outCSV.open("heightMapPointCloudData.xyz");
+                outCSV.open("heightMapPointCloudData.csv");
                 int pointCount = 0; 
                 std::cout << "[Information] \t \t About to parse triangle data to .csv file. This will take a while..." << std::endl;
+
+
                 for (const uint64_t point : pointDataFormatted)
                 {
                     // decode the point values stored in the 64 bit integer
@@ -390,8 +449,11 @@ int main()
 
                     pointCount++; 
                 }
-                outCSV.close(); 
+                                outCSV.close();
 
+                */
+
+                /*
                 ofstream outCSV2;
                 outCSV2.open("trianglePointIDs.csv");
                 int triangleCount = 0;
@@ -407,6 +469,7 @@ int main()
                 }
                 std::cout << "[Information] \t \t Triangles were added: " << triangleCount << std::endl;
                 outCSV2.close();
+                */
             }
         } 
         else
