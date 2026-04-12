@@ -26,14 +26,14 @@ namespace legoCVTests
                     while (std::getline(substream, valueBuffer, ','))
                     {
                         std::cout << "--- val " << (tokenZCount + 1) << ": ";
+
                         // values have to be read as int, not uint 
-                        int zValue = (int)(valueBuffer[0]);
+                        int zValue = std::atoi(valueBuffer.c_str());
                         std::cout << zValue << std::endl;
                         valueBuffer = std::string("");
 
                         tokenZCount++;
                     }
-
                     linecount++;
                 }
                 in.close();

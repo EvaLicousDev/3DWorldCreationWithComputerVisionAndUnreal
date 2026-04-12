@@ -406,11 +406,21 @@ int main()
                 int pointCount = 0;
                 std::cout << "[Information] \t \t About to parse triangle data to .csv file. This will take a while..." << std::endl;
 
+                int linePlace = 1; 
                 for (const uint8_t point : pointData)
                 {
-                    outCSV << point;
-                    if (pointCount < (pixelNum-1)) outCSV << ",";
+                    // UE5s Fileloader and string class are very specific about the needed format
+                    // Therefor we have to output the value as int rather than char
+                    auto castPoint = (int)point; 
+                    outCSV << castPoint;
+                    if (linePlace < (outRowsCols)) outCSV << ",";
+                    if (linePlace == (outRowsCols))
+                    {
+                        outCSV << std::endl;
+                        linePlace = 0; 
+                    }
                     pointCount++;
+                    linePlace++; 
                 }
                 outCSV.close();
                 
