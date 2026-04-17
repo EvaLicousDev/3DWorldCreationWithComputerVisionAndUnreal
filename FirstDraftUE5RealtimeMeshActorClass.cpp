@@ -1,30 +1,21 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "ACPP_RuntimeTerrain.h"
-#include "RealtimeMeshSimple.h"
-
-using namespace RealtimeMesh; 
-
-// Sets default values
-ACPP_RuntimeTerrain::ACPP_RuntimeTerrain()
-{
-	PrimaryActorTick.bCanEverTick = fals// Fill out your copyright notice in the Description page of Project Settings.
-
-#include "ACPP_RuntimeTerrain.h"
+#include "CPP_RuntimeTerrain.h"
 #include "RealtimeMeshSimple.h"
 #include "Misc/AssertionMacros.h"
 
-using namespace RealtimeMesh; 
+using namespace RealtimeMesh;
 
 // Sets default values
 ACPP_RuntimeTerrain::ACPP_RuntimeTerrain()
 {
 	PrimaryActorTick.bCanEverTick = false; //only generate mesh once
-	M_fileLines = TArray<FString, FDefaultAllocator>(); 
-	M_pointData      = TMap<double, FInternalPointData>(); 
+
+	M_fileLines = TArray<FString, FDefaultAllocator>();
+	M_pointData = TMap<double, FInternalPointData>();
 	M_pointBuilderID = TMap<double, uint32>();
-	M_pointLogged    = TMap<double, bool>(); 
-	M_triangles      = TArray<FInternalTriangleData>(); 
+	M_pointLogged = TMap<double, bool>();
+	M_trianglesLOD0 = TArray<FInternalTriangleData>();
 
 }
 
@@ -46,147 +37,130 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Transform)
 		}
 	}
 
-	M_fileLines.Reset(); 
+	M_fileLines.Reset();
 	M_pointData.Reset();
 	M_pointBuilderID.Reset();
 	M_pointLogged.Reset();
-	M_triangles.Reset(); 
+	M_trianglesLOD0.Reset();
 
-	auto vertices = Resolution * Resolution; 
-	M_fileLines.Reserve(vertices +1);
+	auto vertices = Resolution * Resolution;
+	M_fileLines.Reserve(vertices + 1);
 	M_pointData.Reserve(vertices);
+	M_pointsLOD2.Reserve(vertices/2); 
+	M_pointsLOD3.Reserve(vertices/4);
+	M_pointsLOD4.Reserve(vertices/8);
 	M_pointBuilderID.Reserve(vertices);
+
 	M_pointLogged.Reserve(vertices);
-	M_triangles.Reserve(vertices *4);
+	M_trianglesLOD0.Reserve(vertices * 4);
+	M_trianglesLOD1.Reserve(vertices/2 * 4);
+	M_trianglesLOD2.Reserve(vertices/4 * 4);
+	M_trianglesLOD3.Reserve(vertices/8 * 4);
 
 	GetPointDataFromCSV();
-	MakeTriangles();
 
-	if (OnScreenDebugMessages)
-	{
-		if (GEngine)
-		{
-			auto message = FString(TEXT("Created [Triangesls | Points] : [ "));
-			auto triangleCount = M_triangles.Num(); 
-			auto pointCount = M_pointData.Num(); 
-			message += FString::FromInt(triangleCount); 
-			message += TEXT(" | "); 
-			message += FString::FromInt(pointCount);
-			message += TEXT(" ]"); 
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Purple, message);
+	const FColor colors[4] = {FColor::Red, FColor::Emerald, FColor::Cyan, FColor::Purple}; 
 
-		    message = FString(TEXT("Memory for structs in bytes [Triangesls | Points] : [ "));
-		    triangleCount = M_triangles.GetAllocatedSize();
-		    pointCount = M_pointData.GetAllocatedSize();
-			message += FString::FromInt(triangleCount);
-			message += TEXT(" | ");
-			message += FString::FromInt(pointCount);
-			message += TEXT(" ]");
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, message);
-		}
-	}
+	// We want to create 4 levels of detail, less detail the further away we are from a players camera. Therefor we create 4 meshes
+	MakeTriangles(colors[0]);
+	MakeTrianglesForLODs(2, M_pointsLOD2, colors[1]);
+	MakeTrianglesForLODs(4, M_pointsLOD3, colors[2]);
+	MakeTrianglesForLODs(8, M_pointsLOD4, colors[3]);
 
 	//Using open source thrid party plugin that works similar to procedurcal mesh component, but is more memory efficent
-	URealtimeMeshSimple* RealtimeMesh = GetRealtimeMeshComponent()->InitializeRealtimeMesh<URealtimeMeshSimple>(); 
-	FRealtimeMeshStreamSet StreamSet; 
-
+	GetRealtimeMeshComponent()->SetWorldLocation(FVector(0.0, 0.0, 0.0));
+	URealtimeMeshSimple* RealtimeMesh = GetRealtimeMeshComponent()->InitializeRealtimeMesh<URealtimeMeshSimple>();
 	RealtimeMesh->SetupMaterialSlot(0, "PrimaryMaterial");
 
-	// We iterate over triangles to get the data we need for the mesh as the context is important
-	int quadCount = 0; 
-	for (int triangs = 0; triangs < M_triangles.Num(); triangs++)
+	CreateMeshForLODlevel(0, RealtimeMesh, colors[0]);
+	if (GenerateLODs) CreateMeshForLODlevel(1, RealtimeMesh, colors[1]);
+    if (GenerateLODs) CreateMeshForLODlevel(2, RealtimeMesh, colors[2]);
+    if (GenerateLODs) CreateMeshForLODlevel(3, RealtimeMesh, colors[3]);
+
+	MeshBounds = GetRealtimeMeshComponent()->CalcBounds(GetRealtimeMeshComponent()->GetComponentTransform());
+	GetRealtimeMeshComponent()->RegisterComponent();
+}
+
+void ACPP_RuntimeTerrain::CreateMeshForLODlevel(int32 LODlevel, URealtimeMeshSimple* RealtimeMesh, FColor color)
+{
+	// LODlevelFactor = 2^LODlevel
+	// sanity check
+	if (!(LODlevel == 0 || LODlevel == 1 || LODlevel == 2 || LODlevel == 3))
 	{
-		MeshBuilder Builder(StreamSet);
+		UE_LOG(LogTemp, Error, TEXT("[Mesh Creation] Invalid LOD level %d . Has to be between 0 - 3"), LODlevel);
+		return; 
+	}
+
+	FRealtimeMeshStreamSet StreamSet;
+
+	auto trianglesRef = &M_trianglesLOD0;
+	if (LODlevel == 1)      trianglesRef = &M_trianglesLOD1; 
+	else if (LODlevel == 2) trianglesRef = &M_trianglesLOD2;
+	else if (LODlevel == 3) trianglesRef = &M_trianglesLOD3;
+
+	// automatically created level 0 so we only add subsequent LOD levels
+	// also view https://github.com/TriAxis-Games/RealtimeMeshComponent/blob/master/Source/RealtimeMeshExamples/Private/RealtimeMeshLODExample.cpp
+	if (LODlevel > 0)
+	{
+		auto config = FRealtimeMeshLODConfig(FMath::Pow(0.5f, LODlevel));
+		RealtimeMesh->AddLOD(config);
+	}
+
+	// We iterate over triangles to get the data we need for the mesh as the context is important
+	int quadCount = 0;
+	for (int triangs = 0; triangs < trianglesRef->Num(); triangs++)
+	{
+		auto Builder = TRealtimeMeshBuilderLocal<uint32, FPackedNormal, FVector2DHalf, 1, uint32>(StreamSet);
 
 		Builder.EnableTangents();
 		Builder.EnableTexCoords();
 		Builder.EnableColors();
 		Builder.EnablePolyGroups();
 
-		// We have 2 triangles in the poly group of a quad
-		const auto triangle1 = M_triangles[triangs++];
-		const auto triangle2 = M_triangles[triangs];
+		const auto triangle1 = (*trianglesRef)[triangs++];
+		const auto triangle2 = (*trianglesRef)[triangs];
 
-		AddDataToMeshBuilder(Builder, triangle1, quadCount);
-		AddDataToMeshBuilder(Builder, triangle2, quadCount);
+		AddDataToMeshBuilder(Builder, triangle1, LODlevel, color);
+		AddDataToMeshBuilder(Builder, triangle2, LODlevel, color);
 
-		FString quadName = TEXT("Quad_"); 
-		quadName += FString::FromInt(quadCount); 
-		const FRealtimeMeshSectionGroupKey GroupKey = FRealtimeMeshSectionGroupKey::Create(quadCount, FName(quadName));
-		const FRealtimeMeshSectionKey PolyGroupKey= FRealtimeMeshSectionKey::CreateForPolyGroup(GroupKey, quadCount);
-		RealtimeMesh->CreateSectionGroup(GroupKey, StreamSet);
-		RealtimeMesh->UpdateSectionConfig(PolyGroupKey, FRealtimeMeshSectionConfig(0));
-
-		if (OnScreenDebugMessages)
-		{
-			if (GEngine)
-			{
-				quadName += FString(TEXT(" created...")); 
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Blue, quadName);
-			}
-		}
-
-		quadCount++; 
+		quadCount++;
 	}
 
-	if (OnScreenDebugMessages)
+	// reset logged for next mesh
+	for (auto [_, loggedBool] : M_pointLogged)
 	{
-		if (GEngine)
-		{
-			auto info = FString(TEXT("INFORMATION: "));
-			info += FString::FromInt(quadCount); 
-			info += TEXT(" Quads were created");
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, info);
-		}
+		loggedBool = false;
 	}
+
+	if (GEngine && OnScreenDebugMessages)
+	{
+		auto info = FString(TEXT("INFORMATION: "));
+		info += FString::FromInt(quadCount);
+		info += TEXT(" Quads were created for mesh LOD level ");
+		info += FString::FromInt(LODlevel);
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, color, info);
+	}
+
+	FString quadName = TEXT("Mesh_");
+	quadName += FString::FromInt(LODlevel);
+	quadName += FString(TEXT("_Quad_Count_"));
+	quadName += FString::FromInt(quadCount); 
+
+	FString logMsg = TEXT("[Mesh] created with Name: ");
+	logMsg += quadName; 
+	UE_LOG(LogTemp, Warning, TEXT("%s"), *logMsg);
+
+	// Create Section group based on LOD level and update configs  
+	FString lodName = "LOD_"; 
+	lodName += FString::FromInt(LODlevel);
+	const auto GroupKey = FRealtimeMeshSectionGroupKey::Create(LODlevel, FName(lodName));
+	const FRealtimeMeshSectionKey PolyGroup0SectionKey = FRealtimeMeshSectionKey::CreateForPolyGroup(GroupKey, 0);
+	RealtimeMesh->CreateSectionGroup(GroupKey, StreamSet);
+	RealtimeMesh->UpdateSectionConfig(PolyGroup0SectionKey, FRealtimeMeshSectionConfig(0));
 }
 
-/*
-//Assumes data from csv file is 1 row per point, coordinates comma sperated
-void ACPP_RuntimeTerrain::GetPointDataFromCSVParseArray()
-{
-	// read .cvs files to get xyz point data to a comma seperated string
-	auto filehelper = FFileHelper();
-	filehelper.LoadFileToStringArray(M_fileLines, *csvFilePath);
-	FString deliminator = TEXT(",");
-
-	int indexX = 0;
-	int indexY = 0;
-	int pointID = 0;
-
-	// the CV application parses out the z values to a .csv file only for a 400 x 400 px image
-	for (const FString line : M_fileLines)
-	{
-		FInternalPointData point;
-		TArray<FString, FDefaultAllocator> xyz;
-		line.ParseIntoArray(xyz, TEXT(","), true);
-
-		for (const auto& coordinateAsString : xyz)
-		{
-			pointID = indexX + indexY;
-			point.point[0] = indexX * 10; //100 unreal units is rougly 1m 
-			point.point[1] = indexY * 10;
-			point.point[2] = (FCString::Atoi(*line) * 10);
-
-			if (indexX < 399)
-			{
-				indexX++;
-			}
-			else
-			{
-				indexX = 0;
-				indexY++;
-			}
-		}
-		M_pointData.EmplaceByHash(pointID, point);
-		M_pointLogged.EmplaceByHash(pointID, false);
-	}
-}
-*/
-
-
-//We iterate over the triangle data so we can set the vertexes and their colour in context
-void ACPP_RuntimeTerrain::AddDataToMeshBuilder(MeshBuilder& BuilderRef, const FInternalTriangleData& triangleWithPointIDs, uint32 polygroupIndex)
+//We iterate over the triangle data so we can set the vertexes, normals and tangents
+void ACPP_RuntimeTerrain::AddDataToMeshBuilder(TRealtimeMeshBuilderLocal<uint32, FPackedNormal, FVector2DHalf, 1, uint32>& BuilderRef, const FInternalTriangleData& triangleWithPointIDs, uint32 polygroupIndex, FColor color)
 {
 	//Get PointData keys
 	const auto pointKeyA = triangleWithPointIDs.triangleVertexIDs[0] + 1;
@@ -204,14 +178,126 @@ void ACPP_RuntimeTerrain::AddDataToMeshBuilder(MeshBuilder& BuilderRef, const FI
 		{
 			if (GEngine)
 			{
-				auto error = FString(TEXT("ERROR: boolean flag for point logging not initialised!")); 
+				auto error = FString(TEXT("ERROR: boolean flag for point logging not initialised!"));
 				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
 			}
 		}
 		return;
 	}
 
-	//Get points
+	//Get actual points
+	auto pointA = M_pointData.Find(pointKeyA);
+	auto pointB = M_pointData.Find(pointKeyB);
+	auto pointC = M_pointData.Find(pointKeyC);
+
+	if (pointA == nullptr || pointB == nullptr || pointC == nullptr)
+	{
+		if (OnScreenDebugMessages)
+		{
+			if (GEngine)
+			{
+				auto error = FString(TEXT("FATAL ERROR : point data for point not initialised!"));
+				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
+			}
+		}
+		if (LogDebugMessages) UE_LOG(LogTemp, Error, TEXT("[Important Error] [Point] IDs %f %f %f resulted in a nullptr ref for base mesh, point data for point not initialised!"), pointKeyA, pointKeyB, pointKeyC);
+		return;
+	}
+
+	auto invalidID = Resolution * Resolution + 1;
+	uint32 builderA = invalidID, builderB = invalidID, builderC = invalidID;
+	FVector3f vertexA, vertexB, vertexC;       // point data
+	FVector2f positionA, positionB, positionC; // XY / UV coordinates
+
+	//Get normals and tangents - https://forums.unrealengine.com/t/creating-the-tangentx-tangenty-tangentz-from-vertex-and-normal/308424/4
+	FVector Edge1 = { (pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]), (pointB->point[2] - pointA->point[2]) };
+	FVector Edge2 = { (pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]), (pointC->point[2] - pointA->point[2]) };
+	auto dUV1 = FVector2f((pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]));
+	auto dUV2 = FVector2f((pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]));
+	float tangentFactor = 1.0 / (dUV1[0] * dUV2[1] - dUV1[1] * dUV2[0]);
+
+	FVector   NormalVector = FVector::CrossProduct(Edge1, Edge2).GetSafeNormal();
+	FVector3f Tangents{
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[0] - (float)dUV1[1] * (float)Edge2[0])),
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[1] - (float)dUV1[1] * (float)Edge2[1])),
+		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[2] - (float)dUV1[1] * (float)Edge2[2]))
+	};
+
+	NormalVector.Normalize();
+	Tangents.Normalize();
+
+	//Process points by adding position to vertices if not logged yet
+	//If points were logged, then we already added them as vertex to builder and know their new ID
+	if (*pAlogged != true)
+	{
+		AddPointToBuilder(pointKeyA, vertexA, positionA, NormalVector, Tangents, color, BuilderRef, builderA);
+		UE_LOG(LogTemp, Warning, TEXT("[Log] Point A with key %f logged"), pointKeyA);
+	}
+	else
+	{
+		builderA = (*(M_pointBuilderID.Find(pointKeyA))) - 1;
+	}
+
+	if (*pBlogged != true)
+	{
+		AddPointToBuilder(pointKeyB, vertexB, positionB, NormalVector, Tangents, color, BuilderRef, builderB);
+		UE_LOG(LogTemp, Warning, TEXT("[Log] Point B with key %f logged"), pointKeyB);
+	}
+	else
+	{
+		builderB = (*(M_pointBuilderID.Find(pointKeyB))) - 1;
+	}
+
+	if (*pClogged != true)
+	{
+		AddPointToBuilder(pointKeyC, vertexC, positionC, NormalVector, Tangents, color, BuilderRef, builderC);
+		UE_LOG(LogTemp, Warning, TEXT("[Log] Point C with key %f logged"), pointKeyC);
+	}
+	else
+	{
+		builderC = (*(M_pointBuilderID.Find(pointKeyC))) - 1;
+	}
+
+	auto builderIDAInvalid = builderA == invalidID;
+	auto builderIDBInvalid = builderB == invalidID;
+	auto builderIDCInvalid = builderC == invalidID;
+	if ((builderIDAInvalid || builderIDBInvalid || builderIDCInvalid)) //sanity check 
+	{
+		if (OnScreenDebugMessages && GEngine)
+		{
+			auto error = FString(TEXT("ERROR: one of the points in the triangle was not associated with a valid a builder IDs [Builder IDs]"));
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
+		}
+		if (LogDebugMessages) UE_LOG(LogTemp, Display, TEXT("[Builder IDs] A %d B %d, C %d"), builderA, builderB, builderC);
+	}
+
+	//Add triangle to builder 
+	BuilderRef.AddTriangle(builderA, builderB, builderC, 0);
+}
+
+/*
+//We iterate over the triangle data so we can set the vertexes and their colour in context
+void ACPP_RuntimeTerrain::CreateNormalsAndTangentsLODs(const FInternalTriangleData& triangleWithPointIDs, int32 LODlevelFactor, TRealtimeMeshBuilderLocal<uint32, FPackedNormal, FVector2DHalf, 1, uint32>& BuilderRef)
+{
+	bool validLODlvl = ((LODlevelFactor == 0) || (LODlevelFactor == 2) || (LODlevelFactor == 4) || (LODlevelFactor == 8));
+	if (!validLODlvl)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[LOD Gen] Could not deduce LOD level for factor %d"), LODlevelFactor);
+		if (GEngine)
+		{
+			auto error = FString(TEXT("IMPORTANT ERROR: Could not deduce LOD level for factor: "));
+			error += FString::FromInt(LODlevelFactor);
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
+		}
+		return;
+	}
+
+	//Get PointData keys
+	const auto pointKeyA = triangleWithPointIDs.triangleVertexIDs[0] + 1;
+	const auto pointKeyB = triangleWithPointIDs.triangleVertexIDs[1] + 1;
+	const auto pointKeyC = triangleWithPointIDs.triangleVertexIDs[2] + 1;
+
+	//Get actual points
 	auto pointA = M_pointData.Find(pointKeyA);
 	auto pointB = M_pointData.Find(pointKeyB);
 	auto pointC = M_pointData.Find(pointKeyC);
@@ -229,7 +315,7 @@ void ACPP_RuntimeTerrain::AddDataToMeshBuilder(MeshBuilder& BuilderRef, const FI
 		return;
 	}
 
-	auto invalidID = Resolution * Resolution + 1; 
+	auto invalidID = Resolution * Resolution + 1;
 	uint32 builderA = invalidID, builderB = invalidID, builderC = invalidID;
 	FVector3f vertexA, vertexB, vertexC;       // point data
 	FVector2f positionA, positionB, positionC; // XY / UV coordinates
@@ -241,67 +327,38 @@ void ACPP_RuntimeTerrain::AddDataToMeshBuilder(MeshBuilder& BuilderRef, const FI
 	auto dUV2 = FVector2f((pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]));
 	float tangentFactor = 1.0 / (dUV1[0] * dUV2[1] - dUV1[1] * dUV2[0]);
 
-	FVector   NormalVector = FVector::CrossProduct(Edge1, Edge2).GetSafeNormal(); 
+	FVector   NormalVector = FVector::CrossProduct(Edge1, Edge2).GetSafeNormal();
 	FVector3f Tangents{
 		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[0] - (float)dUV1[1] * (float)Edge2[0])),
 		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[1] - (float)dUV1[1] * (float)Edge2[1])),
 		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[2] - (float)dUV1[1] * (float)Edge2[2]))
 	};
 
-	NormalVector.Normalize(); 
-	Tangents.Normalize(); 
+	NormalVector.Normalize();
+	Tangents.Normalize();
 
-	//Process points by adding position to vertices if not logged yet
-	//If points were logged, then we already added them as vertex to builder and know their new ID
-	if (*pAlogged != true)
-	{
-		AddPointToBuilder(pointKeyA, vertexA, positionA, NormalVector, Tangents, FColor::Red, BuilderRef, builderA); 
-		UE_LOG(LogTemp, Warning, TEXT("[Log] Point A with key %f logged"), pointKeyA);
-	}
-	else
-	{
-		builderA = (*(M_pointBuilderID.Find(pointKeyA))) - 1;
-	}
-
-	if (*pBlogged != true)
-	{
-		AddPointToBuilder(pointKeyB, vertexB, positionB, NormalVector, Tangents, FColor::Green, BuilderRef, builderB);
-		UE_LOG(LogTemp, Warning, TEXT("[Log] Point B with key %f logged"), pointKeyB);
-	}
-	else
-	{
-		builderB = (*(M_pointBuilderID.Find(pointKeyB))) - 1;
-	}
-
-	if (*pClogged != true)
-	{
-		AddPointToBuilder(pointKeyC, vertexC, positionC, NormalVector, Tangents, FColor::Blue, BuilderRef, builderC);
-		UE_LOG(LogTemp, Warning, TEXT("[Log] Point C with key %f logged"), pointKeyC);
-	}
-	else
-	{
-		builderC = (*(M_pointBuilderID.Find(pointKeyC))) - 1;
-	}
-
-	auto builderIDAInvalid = builderA == invalidID; 
+	auto builderIDAInvalid = builderA == invalidID;
 	auto builderIDBInvalid = builderB == invalidID;
 	auto builderIDCInvalid = builderC == invalidID;
-	if (OnScreenDebugMessages && (builderIDAInvalid || builderIDBInvalid || builderIDCInvalid)) //sanity check 
+	if ((builderIDAInvalid || builderIDBInvalid || builderIDCInvalid)) //sanity check 
 	{
-		if (GEngine)
+		if (OnScreenDebugMessages && GEngine)
 		{
 			auto error = FString(TEXT("ERROR: one of the points in the triangle was not associated with a valid a builder IDs [Builder IDs]"));
 			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
-			UE_LOG(LogTemp, Warning, TEXT("[Builder IDs] A %d B %d, C %d"), builderA, builderB, builderC); 
 		}
+		if (LogDebugMessages) UE_LOG(LogTemp, Error, TEXT("[LOD lvl factor %d ] [Builder IDs] A %d B %d, C %d"), LODlevelFactor, builderA, builderB, builderC);
+
+		return; 
 	}
 
 	//Add triangle to builder 
-	BuilderRef.AddTriangle(builderA, builderB, builderC, polygroupIndex);
+	BuilderRef.AddTriangle(builderA, builderB, builderC, 0);
 }
+*/
 
 //Adds the data for a point to the builder reference 
-void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& vertex, FVector2f& uv, FVector& Normals, FVector3f& Tangents, FColor Color, MeshBuilder& BuilderRef, uint32& builderID)
+void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& vertex, FVector2f& uv, FVector& Normals, FVector3f& Tangents, FColor Color, TRealtimeMeshBuilderLocal<uint32, FPackedNormal, FVector2DHalf, 1, uint32>& BuilderRef, uint32& builderID)
 {
 	//sanity check 
 	if (!M_pointBuilderID.Contains(pointKey))
@@ -310,7 +367,7 @@ void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& v
 		auto coord = point->point;
 		vertex = FVector3f(coord);
 		uv = FVector2f(vertex[0], vertex[1]); //Investigate: Add world offset
-		FVector3f normals{ (float)Normals[0], (float)Normals[1], (float)Normals[2]};
+		FVector3f normals{ (float)Normals[0], (float)Normals[1], (float)Normals[2] };
 
 		builderID = BuilderRef.AddVertex(vertex)
 			.SetNormalAndTangent(normals, Tangents)
@@ -320,10 +377,10 @@ void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& v
 		UE_LOG(LogTemp, Warning, TEXT("[Pt ID] Builder ID %d was emplaced"), builderID);
 
 		//let us know we added this vertex to the builder
-		M_pointBuilderID.Emplace(pointKey, builderID+1);
+		M_pointBuilderID.Emplace(pointKey, builderID + 1);
 		M_pointLogged.Remove(pointKey);
-		M_pointLogged.Emplace(pointKey, true); 
-		return; 
+		M_pointLogged.Emplace(pointKey, true);
+		return;
 	}
 	else
 	{
@@ -345,19 +402,18 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 	filehelper.LoadFileToStringArray(M_fileLines, *csvFilePath);
 	double pointID = 0.0;
 
-	int lineIndex = 0; 
+	int lineIndex = 0;
 	for (const auto inputLine : M_fileLines)
 	{
-		//values should be chars representing -127 to 128; 
 		TArray<FString, FDefaultAllocator> xyz;
-		xyz.Reserve(400); 
+		xyz.Reserve(Resolution);
 		inputLine.ParseIntoArray(xyz, TEXT(","), true);
 		auto size = xyz.Num();
-		UE_LOG(LogTemp, Warning, TEXT("[RowData] Row %d with %d points"), (lineIndex + 1), size);
+		UE_LOG(LogTemp, Warning, TEXT("[RowData] Row %d with %d points"), (lineIndex), size);
 
 		for (int indexOfYValue = 0; indexOfYValue < xyz.Num(); indexOfYValue++)
 		{
-			int ZValue = (FCString::Atoi(*xyz[indexOfYValue]) * Scale);
+			int ZValue = (FCString::Atoi(*xyz[indexOfYValue]));
 
 			if (LogDebugMessages)
 			{
@@ -368,38 +424,63 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 			}
 
 			FInternalPointData point;
-			pointID = (lineIndex * 40) + (indexOfYValue +1);
-			point.point[0] = indexOfYValue * Scale * 100;
-			point.point[1] = lineIndex * Scale * 100;
-			point.point[2] = (ZValue * Scale * 1);
+			pointID = (lineIndex * Resolution) + (indexOfYValue + 1);
+			point.point[0] = (indexOfYValue) * Scale;
+			point.point[1] = (lineIndex) * Scale;
+			point.point[2] = (ZValue) * (Scale / 100); 
 
-			FVector draw{ point.point[0], point.point[1], point.point[2]};
-
-			if (OnScreenDebugMessages)
+			if (DrawDebugSpheres)
 			{
-				auto xVal = point.point[0]; 
-				auto yVal = point.point[1]; 
-				auto zVal = point.point[2];
-				UE_LOG(LogTemp, Warning, TEXT("[Point] ID %f, X %f, Y %f, Z %f"), pointID, xVal, yVal, zVal);
-				DrawDebugSphere(GetWorld(), draw, 10, 16, FColor::Red, true); 
+				FVector draw{ point.point[0], point.point[1], point.point[2] };
+				DrawDebugSphere(GetWorld(), draw, 5, 16, FColor::Black, true);
 			}
 
+			if (LogDebugMessages)
+			{
+				auto xVal = point.point[0];
+				auto yVal = point.point[1];
+				auto zVal = point.point[2];
+				UE_LOG(LogTemp, Warning, TEXT("[Point] ID %f, X %f, Y %f, Z %f"), pointID, xVal, yVal, zVal);
+			}
+
+			//We create 4 instances to accomodate the "Level of detail" rendering 
+			bool isFirstPoint = lineIndex == 0 && indexOfYValue == 0;
+			bool isFirstLineLast = lineIndex == 0 && ((indexOfYValue + 1) == xyz.Num());
+			bool isLastLineFirst = ((lineIndex + 1) == xyz.Num()) && indexOfYValue == 0;
+			bool isLastLast = ((lineIndex + 1) == xyz.Num()) && ((indexOfYValue + 1) == xyz.Num());
+
 			M_pointData.Emplace(pointID, point);
+			if (isFirstPoint || isFirstLineLast || isLastLineFirst || isLastLast)
+			{
+				// Technically this shouldn't be necessary, it's just to make double sure we always emplace the four corner vertexes
+				M_pointsLOD2.Emplace(pointID, point);
+				M_pointsLOD3.Emplace(pointID, point);
+				M_pointsLOD4.Emplace(pointID, point);
+			}
+			else
+			{
+				if (((lineIndex % 2) == 0) && ((indexOfYValue % 2) == 0)) M_pointsLOD2.Emplace(pointID, point);
+				if (((lineIndex % 4) == 0) && ((indexOfYValue % 4) == 0)) M_pointsLOD3.Emplace(pointID, point);
+				if (((lineIndex % 8) == 0) && ((indexOfYValue % 8) == 0)) M_pointsLOD4.Emplace(pointID, point);
+			}
+		
 			M_pointLogged.Emplace(pointID, false);
 		}
 		lineIndex++;
 	}
 
-	auto lineArraySize = M_fileLines.Num(); 
-	auto pointDataSize = M_pointData.Num(); 
+	auto lineArraySize = M_fileLines.Num();
+	auto pointDataSize = M_pointData.Num();
 	UE_LOG(LogTemp, Warning, TEXT("[Lines Read] %d"), lineIndex);
 	UE_LOG(LogTemp, Warning, TEXT("[Input string array size] %d"), lineArraySize);
 	UE_LOG(LogTemp, Warning, TEXT("[Point Num] Total point after CSV complleted reading: %d"), pointDataSize);
-	ensureMsgf(pointDataSize == 1600, TEXT("Unexpected size for xyz coordinate vector, size was %d"), pointDataSize);
+	ensureMsgf(pointDataSize == (Resolution * Resolution), TEXT("Unexpected size for xyz coordinate vector, size was %d"), pointDataSize);
+
+	TransformCenter = FVector(lineIndex/2, lineIndex/2, 1000); 
 }
 
 // This function maps the Point IDs to triangles in m_triangles
-void ACPP_RuntimeTerrain::MakeTriangles()
+void ACPP_RuntimeTerrain::MakeTriangles(const FColor color)
 {
 	// We use the point IDs to infer pixel position and ierate over the "window" of four pixels at a time
 	// Row 0 would have IDs 0-399, Row 1 400 - 799... So the following 4 coordinates make 1 Square/Quad in our mesh
@@ -411,11 +492,11 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 	// ...points
 
 	int index1 = 0; //technically all could be intialised with 0, but values were put for clarity
-	int index2 = 1; 
-	int index3 = Resolution; 
-	int index4 = Resolution +1;
+	int index2 = 1;
+	int index3 = Resolution;
+	int index4 = Resolution + 1;
 
-	if (M_pointData.Num() != 1600)
+	if (M_pointData.Num() != (Resolution * Resolution))
 	{
 		if (GEngine)
 		{
@@ -431,14 +512,14 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 		{
 			for (int row = 0; row < Resolution; row++)
 			{
-				index1 = (col) + (row*Resolution); 
-				if (index1 < ((Resolution *Resolution) - Resolution))
+				index1 = (col)+(row * Resolution)+1;
+				if (index1 < ((Resolution * Resolution) - (Resolution -1)))
 				{
 					index2 = index1 + 1;
-					index3 = index1 + 40;
+					index3 = index1 + Resolution;
 					index4 = index3 + 1;
 
-					if (index1 < (39 + (40*row)))
+					if (index1 < ((Resolution - 1) + (Resolution * row)))
 					{
 						if (M_pointData.Contains(index1) && M_pointData.Contains(index2) && M_pointData.Contains(index3) && M_pointData.Contains(index4))
 						{
@@ -455,14 +536,14 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 							Triangle2.triangleVertexIDs[1] = index4;
 							Triangle2.triangleVertexIDs[2] = index2;
 
-							M_triangles.Add(Triangle1);
-							M_triangles.Add(Triangle2);
+							M_trianglesLOD0.Add(Triangle1);
+							M_trianglesLOD0.Add(Triangle2);
 
 							if (LogDebugMessages)
 							{
 								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index2, index1);
 								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index4, index2);
-								if (DebugSpheres)
+								if (DrawDebugSpheres)
 								{
 									// Draw sphere at XY coordinates wjere Z = 0
 									auto pt1 = M_pointData.Find(index1);
@@ -475,32 +556,10 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 									FVector pt3V{ pt3->point[0], pt3->point[1], 0.0 };
 									FVector pt4V{ pt4->point[0], pt4->point[1], 0.0 };
 
-									DrawDebugSphere(GetWorld(), pt3V, 10, 16, FColor::Blue, true);
-									DrawDebugSphere(GetWorld(), pt2V, 10, 16, FColor::Blue, true);
-									DrawDebugSphere(GetWorld(), pt1V, 10, 16, FColor::Blue, true);
-
-									DrawDebugSphere(GetWorld(), pt3V, 10, 16, FColor::Emerald, true);
-									DrawDebugSphere(GetWorld(), pt4V, 10, 16, FColor::Emerald, true);
-									DrawDebugSphere(GetWorld(), pt2V, 10, 16, FColor::Emerald, true);
+									DrawDebugSphere(GetWorld(), pt3V, 10, 16, color, true);
+									DrawDebugSphere(GetWorld(), pt2V, 10, 16, color, true);
+									DrawDebugSphere(GetWorld(), pt1V, 10, 16, color, true);
 								}
-
-								auto point1 = M_pointData.Find(index1);
-								auto point2 = M_pointData.Find(index2);
-								auto point3 = M_pointData.Find(index3);
-								auto point4 = M_pointData.Find(index4);
-
-								FVector pt1{ point1->point[0],point1->point[1], point1->point[2] };
-								FVector pt2{ point2->point[0],point2->point[1], point2->point[2] };
-								FVector pt3{ point3->point[0],point3->point[1], point3->point[2] };
-								FVector pt4{ point4->point[0],point4->point[1], point4->point[2] };
-
-								DrawDebugPoint(GetWorld(), pt1, 10, FColor::Blue);
-								DrawDebugPoint(GetWorld(), pt2, 10, FColor::Blue);
-								DrawDebugPoint(GetWorld(), pt3, 10, FColor::Blue);
-
-								DrawDebugPoint(GetWorld(), pt3, 10, FColor::Purple);
-								DrawDebugPoint(GetWorld(), pt4, 10, FColor::Purple);
-								DrawDebugPoint(GetWorld(), pt2, 10, FColor::Purple);
 							}
 						}
 						else
@@ -515,61 +574,23 @@ void ACPP_RuntimeTerrain::MakeTriangles()
 			}
 		}
 	}
-}
-
-void ACPP_RuntimeTerrain::PopulateRealtimeMeshSection()
-{
-
-}
-
-// Called every frame
-void ACPP_RuntimeTerrain::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
-e; //only generate mesh once
-	//m_fileLines = TArray<FString, FDefaultAllocator>(); 
-	M_pointData      = TMap<double, FInternalPointData>(); 
-	M_pointBuilderID = TMap<double, int32>();
-	M_pointLogged    = TMap<double, bool>(); 
-	M_triangles      = TArray<FInternalTriangleData>(); 
-
-}
-
-// Called when the game starts or when spawned
-void ACPP_RuntimeTerrain::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
-{
-	//M_fileLines.Reset(); 
-	M_pointData.Reset();
-	M_pointBuilderID.Reset();
-	M_pointLogged.Reset();
-	M_triangles.Reset(); 
-
-	GetPointDataFromCSV();
-	MakeTriangles();
 
 	if (OnScreenDebugMessages)
 	{
 		if (GEngine)
 		{
-			auto message = FString(TEXT("Created [Triangesls | Points] : [ "));
-			auto triangleCount = M_triangles.Num(); 
-			auto pointCount = M_pointData.Num(); 
-			message += FString::FromInt(triangleCount); 
-			message += TEXT(" | "); 
+			auto message = FString(TEXT("[Base Mesh] Created [Triangesls | Points] : [ "));
+			auto triangleCount = M_trianglesLOD0.Num();
+			auto pointCount = M_pointData.Num();
+			message += FString::FromInt(triangleCount);
+			message += TEXT(" | ");
 			message += FString::FromInt(pointCount);
-			message += TEXT(" ]"); 
+			message += TEXT(" ]");
 			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Purple, message);
 
-		    message = FString(TEXT("Memory for structs in bytes [Triangesls | Points] : [ "));
-		    triangleCount = M_triangles.GetAllocatedSize();
-		    pointCount = M_pointData.GetAllocatedSize();
+			message = FString(TEXT("[Base Mesh] Memory for structs in bytes [Triangesls | Points] : [ "));
+			triangleCount = M_trianglesLOD0.GetAllocatedSize();
+			pointCount = M_pointData.GetAllocatedSize();
 			message += FString::FromInt(triangleCount);
 			message += TEXT(" | ");
 			message += FString::FromInt(pointCount);
@@ -577,359 +598,156 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Tranform)
 			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, message);
 		}
 	}
+}
 
-	//Using open source thrid party plugin that works similar to procedurcal mesh component, but is more memory efficent
-	URealtimeMeshSimple* RealtimeMesh = GetRealtimeMeshComponent()->InitializeRealtimeMesh<URealtimeMeshSimple>(); 
-	FRealtimeMeshStreamSet StreamSet; 
-
-	// We iterate over triangles to get the data we need for the mesh as the context is important
-	int quadCount = 0; 
-	for (int triangs = 0; triangs < M_triangles.Num(); triangs++)
+// This function maps the Point IDs to the LOD meshes
+void ACPP_RuntimeTerrain::MakeTrianglesForLODs(const int32 LODlevelFactor, const TMap<double, FInternalPointData>& points, const FColor color)
+{
+	bool validLODlvl = ((LODlevelFactor == 2) || (LODlevelFactor == 4) || (LODlevelFactor == 8));
+	if (!validLODlvl)
 	{
-		TRealtimeMeshBuilderLocal<uint16, FPackedNormal, FVector2DHalf, 1> Builder(StreamSet);
-
-		Builder.EnableTangents();
-		Builder.EnableTexCoords();
-		Builder.EnableColors();
-		Builder.EnablePolyGroups();
-
-		// We have 2 triangles in the poly group of a quad
-		const auto triangle1 = M_triangles[triangs++];
-		const auto triangle2 = M_triangles[triangs];
-
-		AddDataToMeshBuilder(Builder, triangle1, quadCount);
-		AddDataToMeshBuilder(Builder, triangle2, quadCount);
-
-		FString quadName = TEXT("Quad_"); 
-		quadName += FString::FromInt(quadCount); 
-		const FRealtimeMeshSectionGroupKey GroupKey = FRealtimeMeshSectionGroupKey::Create(quadCount, FName(quadName));
-
-		if (OnScreenDebugMessages)
+		UE_LOG(LogTemp, Error, TEXT("[LOD Gen] Could not generate LOD level for mesh factord by %d. RT Mesh not generated"), LODlevelFactor);
+		if (GEngine)
 		{
-			if (GEngine)
+			auto error = FString(TEXT("IMPORTANT ERROR: Could not generate runtime mesh with LOD level factor:"));
+			error += FString::FromInt(LODlevelFactor);
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
+		}
+		return;
+	}
+
+	auto* triangleArray = &M_trianglesLOD0;
+	if (LODlevelFactor == 2)
+	{
+		triangleArray = &M_trianglesLOD1; 
+	}
+	else if (LODlevelFactor == 4)
+	{
+		triangleArray = &M_trianglesLOD2; 
+	}
+	else if (LODlevelFactor == 8)
+	{
+		triangleArray = &M_trianglesLOD3;
+	}
+
+	int index1 = 0; //technically all could be intialised with 0, but values were put for clarity
+	int index2 = 1;
+	int index3 = (Resolution/LODlevelFactor);
+	int index4 = (Resolution/LODlevelFactor) + 1;
+
+	/*
+	if (points.Num() != (Resolution/LODlevelFactor * Resolution/LODlevelFactor))
+	{
+		auto pt = points.Num(); 
+		if (GEngine)
+		{
+			auto error = FString(TEXT("IMPORTANT ERROR: Number of points for LOD level factor "));
+			error += FString::FromInt(LODlevelFactor);
+			error += FString(TEXT(" is incorrect! Check CSV reading. Number: "));
+			error += FString::FromInt(M_pointData.Num());
+			error += FString(TEXT(" Expected: "));
+			error += FString::FromInt(((Resolution/LODlevelFactor)*(Resolution/LODlevelFactor)));
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
+		}
+		UE_LOG(LogTemp, Error, TEXT("[LOD Triangle Creation] Creating triangles for LOD lvl factor %d not possible doe to points num being %d"), LODlevelFactor, pt);
+	}
+	*/
+	if (!points.IsEmpty())
+	{
+		for (int col = 0; col < Resolution/LODlevelFactor; col++)
+		{
+			for (int row = 0; row < Resolution/LODlevelFactor; row++)
 			{
-				quadName += FString(TEXT(" created...")); 
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Blue, quadName);
+				index1 = (col)+(row * (Resolution/LODlevelFactor)) + 1;
+				if (index1 < (((Resolution / LODlevelFactor) * (Resolution / LODlevelFactor)) - (Resolution / LODlevelFactor)))
+				{
+					index2 = index1 + 1;
+					index3 = index1 + (Resolution / LODlevelFactor);
+					index4 = index3 + 1;
+
+					if (index1 < (((Resolution / LODlevelFactor) - 1) + ((Resolution / LODlevelFactor) * row)))
+					{
+						if (points.Contains(index1) && points.Contains(index2) && points.Contains(index3) && points.Contains(index4))
+						{
+							// Triangles for meshes have to be created counter clockwise
+							// We split the above mentioned quad into two by edge betweem vertices [index 3 - index 2]
+							FInternalTriangleData Triangle1;
+							FInternalTriangleData Triangle2;
+
+							Triangle1.triangleVertexIDs[0] = index3;
+							Triangle1.triangleVertexIDs[1] = index2;
+							Triangle1.triangleVertexIDs[2] = index1;
+
+							Triangle2.triangleVertexIDs[0] = index3;
+							Triangle2.triangleVertexIDs[1] = index4;
+							Triangle2.triangleVertexIDs[2] = index2;
+
+						    triangleArray->Add(Triangle1);
+							triangleArray->Add(Triangle2);
+
+							if (LogDebugMessages)
+							{
+								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index2, index1);
+								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index4, index2);
+								if (DrawDebugSpheres)
+								{
+									// Draw sphere at XY coordinates wjere Z = 0
+									auto pt1 = points.Find(index1);
+									auto pt2 = points.Find(index2);
+									auto pt3 = points.Find(index3);
+									auto pt4 = points.Find(index4);
+
+									FVector pt1V{ pt1->point[0], pt1->point[1], 0.0 };
+									FVector pt2V{ pt2->point[0], pt2->point[1], 0.0 };
+									FVector pt3V{ pt3->point[0], pt3->point[1], 0.0 };
+									FVector pt4V{ pt4->point[0], pt4->point[1], 0.0 };
+
+									DrawDebugSphere(GetWorld(), pt3V, 10+LODlevelFactor, 16, color, true);
+									DrawDebugSphere(GetWorld(), pt2V, 10+LODlevelFactor, 16, color, true);
+									DrawDebugSphere(GetWorld(), pt1V, 10+LODlevelFactor, 16, color, true);
+								}
+							}
+						}
+						else
+						{
+							if (!M_pointData.Contains(index1)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 1 for LODlevelFactor %d does not exist in point data. ID %d"), index1, LODlevelFactor);
+							if (!M_pointData.Contains(index2)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 2 for LODlevelFactor %d does not exist in point data. ID %d"), index2, LODlevelFactor);
+							if (!M_pointData.Contains(index3)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 3 for LODlevelFactor %d does not exist in point data. ID %d"), index3, LODlevelFactor);
+							if (!M_pointData.Contains(index4)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 4 for LODlevelFactor %d does not exist in point data. ID %d"), index4, LODlevelFactor);
+						}
+					}
+				}
 			}
 		}
-
-		quadCount++; 
 	}
 
 	if (OnScreenDebugMessages)
 	{
 		if (GEngine)
 		{
-			auto info = FString(TEXT("INFORMATION: "));
-			info += FString::FromInt(quadCount); 
-			info += TEXT(" Quads were created");
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, info);
-		}
-	}
-}
+			auto lodFactorString = FString(TEXT("[LOD "));
+			lodFactorString += FString::FromInt(LODlevelFactor);
+			lodFactorString += FString(TEXT("] "));
 
-/*
-//Assumes data from csv file is 1 row per point, coordinates comma sperated
-void ACPP_RuntimeTerrain::GetPointDataFromCSVParseArray()
-{
-	// read .cvs files to get xyz point data to a comma seperated string
-	auto filehelper = FFileHelper();
-	filehelper.LoadFileToStringArray(m_fileLines, TEXT("C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/out/build/x64-debug/heightMapPointCloudData.csv"));
-	FString deliminator = TEXT(",");
+			auto message = lodFactorString; 
+		    message += FString(TEXT("Created [Triangesls | Points] : [ "));
+			auto triangleCount = triangleArray->Num();
+			auto pointCount = points.Num();
+			message += FString::FromInt(triangleCount);
+			message += TEXT(" | ");
+			message += FString::FromInt(pointCount);
+			message += TEXT(" ]");
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, color, message);
 
-	int indexX = 0;
-	int indexY = 0;
-	int pointID = 0;
-
-	// the CV application parses out the z values to a .csv file only for a 400 x 400 px image
-	for (const FString line : m_fileLines)
-	{
-		FInternalPointData point;
-		TArray<FString, FDefaultAllocator> xyz;
-		line.ParseIntoArray(xyz, TEXT(","), true);
-
-		for (const auto& coordinateAsString : xyz)
-		{
-			pointID = indexX + indexY;
-			point.point[0] = indexX * 10; //100 unreal units is rougly 1m 
-			point.point[1] = indexY * 10;
-			point.point[2] = (FCString::Atoi(*line) * 10);
-
-			if (indexX < 399)
-			{
-				indexX++;
-			}
-			else
-			{
-				indexX = 0;
-				indexY++;
-			}
-		}
-		M_pointData.EmplaceByHash(pointID, point);
-		M_pointLogged.EmplaceByHash(pointID, false);
-	}
-}
-*/
-
-//We iterate over the triangle data so we can set the vertexes and their colour in context
-void ACPP_RuntimeTerrain::AddDataToMeshBuilder(TRealtimeMeshBuilderLocal<uint16, FPackedNormal, FVector2DHalf, 1>& BuilderRef, const FInternalTriangleData& triangleWithPointIDs, int8 polygroupIndex)
-{
-	//Get PointData keys
-	const auto pointKeyA = triangleWithPointIDs.triangleVertexIDs[0];
-	const auto pointKeyB = triangleWithPointIDs.triangleVertexIDs[1];
-	const auto pointKeyC = triangleWithPointIDs.triangleVertexIDs[2];
-
-	//check which one's were logged already
-	auto pAlogged = M_pointLogged.Find(pointKeyA);
-	auto pBlogged = M_pointLogged.Find(pointKeyB);
-	auto pClogged = M_pointLogged.Find(pointKeyC);
-
-	if (pAlogged == nullptr || pBlogged == nullptr || pClogged == nullptr)
-	{
-		if (OnScreenDebugMessages)
-		{
-			if (GEngine)
-			{
-				auto error = FString(TEXT("ERROR: boolean flag for point logging not initialised!")); 
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
-			}
-		}
-		return;
-	}
-
-	//Get points
-	auto pointA = M_pointData.Find(pointKeyA);
-	auto pointB = M_pointData.Find(pointKeyB);
-	auto pointC = M_pointData.Find(pointKeyC);
-
-	if (pointA == nullptr || pointB == nullptr || pointC == nullptr)
-	{
-		if (OnScreenDebugMessages)
-		{
-			if (GEngine)
-			{
-				auto error = FString(TEXT("FATAL ERROR : point data for point not initialised!"));
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
-			}
-		}
-		return;
-	}
-
-	int32 builderA = -1, builderB = -1, builderC = -1;
-	FVector3f vertexA, vertexB, vertexC;       // point data
-	FVector2f positionA, positionB, positionC; // XY / UV coordinates
-
-	//Get normals and tangents - https://forums.unrealengine.com/t/creating-the-tangentx-tangenty-tangentz-from-vertex-and-normal/308424/4
-	FVector Edge1 = { (pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]), (pointB->point[2] - pointA->point[2]) };
-	FVector Edge2 = { (pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]), (pointC->point[2] - pointA->point[2]) };
-	auto dUV1 = FVector2f((pointB->point[0] - pointA->point[0]), (pointB->point[1] - pointA->point[1]));
-	auto dUV2 = FVector2f((pointC->point[0] - pointA->point[0]), (pointC->point[1] - pointA->point[1]));
-	float tangentFactor = 1.0 / (dUV1[0] * dUV2[1] - dUV1[1] * dUV2[0]);
-
-	FVector   NormalVector = FVector::CrossProduct(Edge1, Edge2).GetSafeNormal(); 
-	FVector3f Tangents{
-		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[0] - (float)dUV1[1] * (float)Edge2[0])),
-		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[1] - (float)dUV1[1] * (float)Edge2[1])),
-		(float)(tangentFactor * ((float)dUV2[1] * (float)Edge1[2] - (float)dUV1[1] * (float)Edge2[2]))
-	};
-
-	NormalVector.Normalize(); 
-	Tangents.Normalize(); 
-
-	//Process points by adding position to vertices if not logged yet
-	//If points were logged, then we already added them as vertex to builder and know their new ID
-	if (*pAlogged != true)
-	{
-		AddPointToBuilder(pointKeyA, vertexA, positionA, NormalVector, Tangents, FColor::Red, BuilderRef, builderA); 
-	}
-	else
-	{
-		builderA = *(M_pointBuilderID.Find(pointKeyA));
-	}
-
-	if (*pBlogged != true)
-	{
-		AddPointToBuilder(pointKeyB, vertexB, positionB, NormalVector, Tangents, FColor::Green, BuilderRef, builderB);
-	}
-	else
-	{
-		builderB = *(M_pointBuilderID.Find(pointKeyB));
-	}
-
-	if (*pClogged != true)
-	{
-		AddPointToBuilder(pointKeyC, vertexC, positionC, NormalVector, Tangents, FColor::Blue, BuilderRef, builderC);
-	}
-	else
-	{
-		builderC = *(M_pointBuilderID.Find(pointKeyC));
-	}
-
-
-	if (OnScreenDebugMessages && (builderA == -1 || builderB == -1 || builderC == -1)) //sanity check 
-	{
-		if (GEngine)
-		{
-			auto error = FString(TEXT("ERROR: one of the points has not got a builder ID"));
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
-		}
-	}
-
-	//Add triangle to builder 
-	BuilderRef.AddTriangle(builderA, builderB, builderC, polygroupIndex);
-}
-
-//Adds the data for a point to the builder reference 
-void ACPP_RuntimeTerrain::AddPointToBuilder(const double& pointKey, FVector3f& vertex, FVector2f& uv, FVector& Normals, FVector3f& Tangents, FColor Color, TRealtimeMeshBuilderLocal<uint16, FPackedNormal, FVector2DHalf, 1>& BuilderRef, int32& builderID)
-{
-	//sanity check 
-	if (!M_pointBuilderID.Contains(pointKey))
-	{
-		auto point = M_pointData.Find(pointKey);
-		auto coord = point->point;
-		vertex = FVector3f(coord);
-		uv = FVector2f(vertex[0], vertex[1]); //Investigate: Add world offset
-		FVector3f normals{ (float)Normals[0], (float)Normals[1], (float)Normals[2]};
-
-		builderID = BuilderRef.AddVertex(vertex)
-			.SetNormalAndTangent(normals, Tangents)
-			.SetColor(Color)
-			.SetTexCoord(uv);
-
-		//let us know we added this vertex to the builder
-		M_pointBuilderID.Emplace(pointKey, builderID);
-		return; 
-	}
-	else
-	{
-		if (OnScreenDebugMessages) //fatal error
-		{
-			if (GEngine)
-			{
-				auto error = FString(TEXT("FATAL ERROR: pointKey was not found in builderID map"));
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, error);
-			}
-		}
-	}
-}
-
-//Assumes data in csv file is singel comma sperated line
-void ACPP_RuntimeTerrain::GetPointDataFromCSV()
-{
-	// read .cvs files to get xyz point data to a comma seperated string
-	auto filehelper = FFileHelper();
-	filehelper.LoadFileToString(M_dataString, *(FPaths::ProjectConfigDir() + csvFilePath));
-	FString deliminator = TEXT(",");
-
-	int indexX  = 0.0;
-	int indexY  = 0.0;
-	double pointID = 0.0;
-
-	// the CV application parses out the z values to a .csv file only for a 400 x 400 px image
-	if (M_dataString.IsEmpty())
-	{
-		if (OnScreenDebugMessages) //sanity check 
-		{
-			if (GEngine)
-			{
-				auto error = FString(TEXT("ERROR: CSV File could not be loaded, string is empty"));
-				GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, error);
-			}
-		}
-		return; 
-	}
-
-	TArray<FString, FDefaultAllocator> xyz;
-	M_dataString.ParseIntoArray(xyz, TEXT(","), true);
-	for (int indexOfYValue = 0; indexOfYValue < xyz.Num(); indexOfYValue++)
-	{
-		FInternalPointData point;
-		pointID = indexX + indexY;
-		point.point[0] = indexX * Scale;
-		point.point[1] = indexY * Scale;
-		point.point[2] = (FCString::Atoi(*xyz[indexOfYValue]) * Scale);
-
-		if (OnScreenDebugMessages)
-		{
-			FVector center{ point.point[0], point.point[1], point.point[2] };
-			DrawDebugSphere(GetWorld(), center, 25.0f, 16, FColor::Red, true);
-		}
-
-		// Recreate the image dimensions 
-		if (indexX < 399)
-		{
-			indexX++;
-		}
-		else
-		{
-			indexX = 0;
-			indexY++;
-		}
-
-		M_pointData.Emplace(pointID, point);
-		M_pointLogged.Emplace(pointID, false);
-	}
-}
-
-// This function maps the Point IDs to triangles in m_triangles
-void ACPP_RuntimeTerrain::MakeTriangles()
-{
-	// We use the point IDs to infer pixel position and ierate over the "window" of four pixels at a time
-	// Row 0 would have IDs 0-399, Row 1 400 - 799... So the following 4 coordinates make 1 Square/Quad in our mesh
-	// One quad consists of 2 triangles
-	// Imagine the matrix of points with our window like this: 
-	// 
-	// [index 1    index 2] ... points
-	// [index 3    index 4] ... points
-	// ...points
-
-	int index1 = 0; //technically all could be intialised with 0, but values were put for clarity
-	int index2 = 1; 
-	int index3 = 400; 
-	int index4 = 401;
-
-	if (M_pointData.Num() != 160000)
-	{
-		if (GEngine)
-		{
-			auto error = FString(TEXT("IMPORTANT ERROR: The number of points allocated during the reading of the CSV is incorrect!"));
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
-		}
-	}
-
-	if (!M_pointData.IsEmpty())
-	{
-		for (int col = 0; col < 398; col++)
-		{
-			for (int row = 0; row < 398; row++)
-			{
-				index1 = row + col;
-				if (index1 < (160000 - 400))
-				{
-					index2 = index1 + 1;
-					index3 = (400 * row) + col;
-					index4 = index3 + 1;
-
-					if (M_pointData.Contains(index1) && M_pointData.Contains(index2) && M_pointData.Contains(index3) && M_pointData.Contains(index4))
-					{
-						// Triangles for meshes have to be created counter clockwise
-						// We split the above mentioned quad into two by edge betweem vertices [index 3 - index 2]
-						FInternalTriangleData Triangle1;
-						FInternalTriangleData Triangle2;
-
-						Triangle1.triangleVertexIDs[0] = index3;
-						Triangle1.triangleVertexIDs[1] = index2;
-						Triangle1.triangleVertexIDs[2] = index1;
-
-						Triangle2.triangleVertexIDs[0] = index3;
-						Triangle2.triangleVertexIDs[1] = index4;
-						Triangle2.triangleVertexIDs[2] = index2;
-
-						M_triangles.Add(Triangle1);
-						M_triangles.Add(Triangle2);
-					}
-				}
-			}
+			message = lodFactorString; 
+			message += FString(TEXT("Memory for structs in bytes [Triangesls | Points] : [ "));
+			triangleCount = triangleArray->GetAllocatedSize();
+			pointCount = points.GetAllocatedSize();
+			message += FString::FromInt(triangleCount);
+			message += TEXT(" | ");
+			message += FString::FromInt(pointCount);
+			message += TEXT(" ]");
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, color, message);
 		}
 	}
 }
