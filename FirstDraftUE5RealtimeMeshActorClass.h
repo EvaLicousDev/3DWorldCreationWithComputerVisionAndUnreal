@@ -70,7 +70,7 @@ public:
 	double Resolution{ 40.0 };
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "3_Show_Debug_Messages")
-	bool OnScreenDebugMessages = true;
+	bool OnScreenDebugMessages = false;
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "3_Log_Debug_Messages")
 	bool LogDebugMessages = true;
@@ -97,6 +97,15 @@ public:
 			pointdata.Add(pt.point); 
 		}
 		return pointdata; 
+	}
+
+	UPROPERTY(BlueprintReadWrite, Category = "OuterPoints")
+	TArray<FVector3f> OuterPoints{};
+
+	UFUNCTION(BlueprintCallable)
+	TArray<FVector3f> getOuterPoints()
+	{
+		return OuterPoints;
 	}
 
 	UPROPERTY(BlueprintReadWrite, Category = "TransformCenter")
