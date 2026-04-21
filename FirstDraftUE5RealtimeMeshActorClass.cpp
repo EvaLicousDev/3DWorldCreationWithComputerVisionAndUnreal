@@ -61,14 +61,20 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Transform)
 
 	const FColor colors[4] = {FColor::Red, FColor::Emerald, FColor::Cyan, FColor::Purple}; 
 
+	//Using open source thrid party plugin that works similar to procedurcal mesh component, but is more memory efficent
+	GetRealtimeMeshComponent()->SetWorldLocation(FVector(0.0, 0.0, 0.0));
+	GetRealtimeMeshComponent()->SetGenerateOverlapEvents(true);
+	GetRealtimeMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetRealtimeMeshComponent()->SetCollisionProfileName(TEXT("BlockAll"));
+	GetRealtimeMeshComponent()->SetCollisionObjectType(ECC_WorldDynamic);
+	GetRealtimeMeshComponent()->SetCollisionResponseToAllChannels(ECR_Block);
+
 	// We want to create 4 levels of detail, less detail the further away we are from a players camera. Therefor we create 4 meshes
 	MakeTriangles(colors[0]);
 	MakeTrianglesForLODs(2, M_pointsLOD2, colors[1]);
 	MakeTrianglesForLODs(4, M_pointsLOD3, colors[2]);
 	MakeTrianglesForLODs(8, M_pointsLOD4, colors[3]);
 
-	//Using open source thrid party plugin that works similar to procedurcal mesh component, but is more memory efficent
-	GetRealtimeMeshComponent()->SetWorldLocation(FVector(0.0, 0.0, 0.0));
 	URealtimeMeshSimple* RealtimeMesh = GetRealtimeMeshComponent()->InitializeRealtimeMesh<URealtimeMeshSimple>();
 	RealtimeMesh->SetupMaterialSlot(0, "PrimaryMaterial");
 
@@ -78,7 +84,10 @@ void ACPP_RuntimeTerrain::OnConstruction(const FTransform& Transform)
     if (GenerateLODs) CreateMeshForLODlevel(3, RealtimeMesh, colors[3]);
 
 	MeshBounds = GetRealtimeMeshComponent()->CalcBounds(GetRealtimeMeshComponent()->GetComponentTransform());
+	GetRealtimeMeshComponent()->RecreatePhysicsState();
+
 	GetRealtimeMeshComponent()->RegisterComponent();
+	RootComponent = GetRealtimeMeshComponent(); 
 }
 
 void ACPP_RuntimeTerrain::CreateMeshForLODlevel(int32 LODlevel, URealtimeMeshSimple* RealtimeMesh, FColor color)
@@ -456,6 +465,15 @@ void ACPP_RuntimeTerrain::GetPointDataFromCSV()
 				M_pointsLOD2.Emplace(pointID, point);
 				M_pointsLOD3.Emplace(pointID, point);
 				M_pointsLOD4.Emplace(pointID, point);
+
+				if (OuterPoints.Num() < 4)
+				{
+					auto pt1 = point.point[0];
+					auto pt2 = point.point[1];
+					auto pt3 = point.point[2];
+					UE_LOG(LogTemp, Warning, TEXT("[Corner] Point %f %f %f added to corners"), pt1, pt2, pt3);
+					OuterPoints.Add(point.point);
+				}
 			}
 			else
 			{
@@ -635,86 +653,66 @@ void ACPP_RuntimeTerrain::MakeTrianglesForLODs(const int32 LODlevelFactor, const
 	int index3 = (Resolution/LODlevelFactor);
 	int index4 = (Resolution/LODlevelFactor) + 1;
 
-	/*
-	if (points.Num() != (Resolution/LODlevelFactor * Resolution/LODlevelFactor))
-	{
-		auto pt = points.Num(); 
-		if (GEngine)
-		{
-			auto error = FString(TEXT("IMPORTANT ERROR: Number of points for LOD level factor "));
-			error += FString::FromInt(LODlevelFactor);
-			error += FString(TEXT(" is incorrect! Check CSV reading. Number: "));
-			error += FString::FromInt(M_pointData.Num());
-			error += FString(TEXT(" Expected: "));
-			error += FString::FromInt(((Resolution/LODlevelFactor)*(Resolution/LODlevelFactor)));
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, error);
-		}
-		UE_LOG(LogTemp, Error, TEXT("[LOD Triangle Creation] Creating triangles for LOD lvl factor %d not possible doe to points num being %d"), LODlevelFactor, pt);
-	}
-	*/
 	if (!points.IsEmpty())
 	{
-		for (int col = 0; col < Resolution/LODlevelFactor; col++)
+		for (int col = 0; col < points.Num(); col++)
 		{
-			for (int row = 0; row < Resolution/LODlevelFactor; row++)
+			for (int row = 0; row < points.Num(); row++)
 			{
-				index1 = (col)+(row * (Resolution/LODlevelFactor)) + 1;
-				if (index1 < (((Resolution / LODlevelFactor) * (Resolution / LODlevelFactor)) - (Resolution / LODlevelFactor)))
+				index1 = (col)+(row * (points.Num())) + 1;
+				index2 = index1 + 1;
+				index3 = index1 + (points.Num());
+				index4 = index3 + 1;
+
+				if (index1 < ((points.Num()) + ((points.Num()) * row)))
 				{
-					index2 = index1 + 1;
-					index3 = index1 + (Resolution / LODlevelFactor);
-					index4 = index3 + 1;
-
-					if (index1 < (((Resolution / LODlevelFactor) - 1) + ((Resolution / LODlevelFactor) * row)))
+					if (points.Contains(index1) && points.Contains(index2) && points.Contains(index3) && points.Contains(index4))
 					{
-						if (points.Contains(index1) && points.Contains(index2) && points.Contains(index3) && points.Contains(index4))
+						// Triangles for meshes have to be created counter clockwise
+						// We split the above mentioned quad into two by edge betweem vertices [index 3 - index 2]
+						FInternalTriangleData Triangle1;
+						FInternalTriangleData Triangle2;
+
+						Triangle1.triangleVertexIDs[0] = index3;
+						Triangle1.triangleVertexIDs[1] = index2;
+						Triangle1.triangleVertexIDs[2] = index1;
+
+						Triangle2.triangleVertexIDs[0] = index3;
+						Triangle2.triangleVertexIDs[1] = index4;
+						Triangle2.triangleVertexIDs[2] = index2;
+
+						triangleArray->Add(Triangle1);
+						triangleArray->Add(Triangle2);
+
+						if (LogDebugMessages)
 						{
-							// Triangles for meshes have to be created counter clockwise
-							// We split the above mentioned quad into two by edge betweem vertices [index 3 - index 2]
-							FInternalTriangleData Triangle1;
-							FInternalTriangleData Triangle2;
-
-							Triangle1.triangleVertexIDs[0] = index3;
-							Triangle1.triangleVertexIDs[1] = index2;
-							Triangle1.triangleVertexIDs[2] = index1;
-
-							Triangle2.triangleVertexIDs[0] = index3;
-							Triangle2.triangleVertexIDs[1] = index4;
-							Triangle2.triangleVertexIDs[2] = index2;
-
-						    triangleArray->Add(Triangle1);
-							triangleArray->Add(Triangle2);
-
-							if (LogDebugMessages)
+							UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index2, index1);
+							UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index4, index2);
+							if (DrawDebugSpheres)
 							{
-								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index2, index1);
-								UE_LOG(LogTemp, Warning, TEXT("[Triangle] IDs %d %d %d"), index3, index4, index2);
-								if (DrawDebugSpheres)
-								{
-									// Draw sphere at XY coordinates wjere Z = 0
-									auto pt1 = points.Find(index1);
-									auto pt2 = points.Find(index2);
-									auto pt3 = points.Find(index3);
-									auto pt4 = points.Find(index4);
+								// Draw sphere at XY coordinates wjere Z = 0
+								auto pt1 = points.Find(index1);
+								auto pt2 = points.Find(index2);
+								auto pt3 = points.Find(index3);
+								auto pt4 = points.Find(index4);
 
-									FVector pt1V{ pt1->point[0], pt1->point[1], 0.0 };
-									FVector pt2V{ pt2->point[0], pt2->point[1], 0.0 };
-									FVector pt3V{ pt3->point[0], pt3->point[1], 0.0 };
-									FVector pt4V{ pt4->point[0], pt4->point[1], 0.0 };
+								FVector pt1V{ pt1->point[0], pt1->point[1], 0.0 };
+								FVector pt2V{ pt2->point[0], pt2->point[1], 0.0 };
+								FVector pt3V{ pt3->point[0], pt3->point[1], 0.0 };
+								FVector pt4V{ pt4->point[0], pt4->point[1], 0.0 };
 
-									DrawDebugSphere(GetWorld(), pt3V, 10+LODlevelFactor, 16, color, true);
-									DrawDebugSphere(GetWorld(), pt2V, 10+LODlevelFactor, 16, color, true);
-									DrawDebugSphere(GetWorld(), pt1V, 10+LODlevelFactor, 16, color, true);
-								}
+								DrawDebugSphere(GetWorld(), pt3V, 10 + LODlevelFactor, 16, color, true);
+								DrawDebugSphere(GetWorld(), pt2V, 10 + LODlevelFactor, 16, color, true);
+								DrawDebugSphere(GetWorld(), pt1V, 10 + LODlevelFactor, 16, color, true);
 							}
 						}
-						else
-						{
-							if (!M_pointData.Contains(index1)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 1 for LODlevelFactor %d does not exist in point data. ID %d"), index1, LODlevelFactor);
-							if (!M_pointData.Contains(index2)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 2 for LODlevelFactor %d does not exist in point data. ID %d"), index2, LODlevelFactor);
-							if (!M_pointData.Contains(index3)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 3 for LODlevelFactor %d does not exist in point data. ID %d"), index3, LODlevelFactor);
-							if (!M_pointData.Contains(index4)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 4 for LODlevelFactor %d does not exist in point data. ID %d"), index4, LODlevelFactor);
-						}
+					}
+					else
+					{
+						if (!M_pointData.Contains(index1)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 1 for LODlevelFactor %d does not exist in point data. ID %d"), index1, LODlevelFactor);
+						if (!M_pointData.Contains(index2)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 2 for LODlevelFactor %d does not exist in point data. ID %d"), index2, LODlevelFactor);
+						if (!M_pointData.Contains(index3)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 3 for LODlevelFactor %d does not exist in point data. ID %d"), index3, LODlevelFactor);
+						if (!M_pointData.Contains(index4)) UE_LOG(LogTemp, Warning, TEXT("[Missing point ID] Index 4 for LODlevelFactor %d does not exist in point data. ID %d"), index4, LODlevelFactor);
 					}
 				}
 			}
