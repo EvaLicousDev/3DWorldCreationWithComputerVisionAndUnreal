@@ -52,7 +52,7 @@ Example of in-development debug screenshot mapping colours to the procedural mes
 
 The CMake application uses an algorithmic approach applying thresholding, segmentation,  
 feature and colour detection to locate the lego plate in the images and then differentiates between bricks, using that data to create:
-1) A PNG file mapping each pixels color to the relative location of the correspondin brick 
+1) A PNG file mapping each pixels color to the relative location of the corresponding brick 
 2) A .csv file containing pixelvalues of a height map generated with the image information
 3) A persistent error log file, which the user can choose to reset at the start of the application or not
 4) Consol error messages as well as warnings for various parts of the application so failure can be investigated
