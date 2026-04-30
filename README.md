@@ -1,40 +1,79 @@
 ----------------------------------------------------------------------------------------
 COMPUTER VISION TABLETOP RPG MAP CREATOR  -  SETUP GUIDE
 ----------------------------------------------------------------------------------------
-Last updated 30.04.26 (Added demo videos for game logic)
+Last updated 30.04.26 (Added demo videos for UE5 internal game logic)
 
 Thank you for reading the set-up guide! This document covers system purpose, achitecture
 and technologies, and should enable any reader to navigate the repository & possibly 
 build their own versions with this source code. 
 
-This project was created as dissertation project (Jan 2026 - April 2026) by Eva Martens.
+It also includes a video breakdown of the core logic implmented in UE5 to spawn the procedural mesh and sample it at runtime below.
+
+----------------------------------------------------------------------------------------
+PROJECT STAGE
+----------------------------------------------------------------------------------------
+Rasberry Pi 5 Camera System                   - Version 1 - complete
+Algorithmic Computer Vision CMake Application - Version 1 - complete
+Unreal Engine 5 Map creation game instnace    - Proof of concept achieved - in progress
+
+Overall: Proof of concept achieved
+----------------------------------------------------------------------------------------
+                                 CORE TECHNOLOGIES
+----------------------------------------------------------------------------------------
+
+PYTHON 3              : FLASK, OPEN CV 2, PICAMERA 2
+
+C++ 20 or 23          : CMAKE, OPEN CV 4, GCC
+
+XML                   : YAML 
+
+UNREAL ENGINE 5.4 - 7 : PCG content plugin, Geometry Script Plugin, Procedural Mesh Component Plugin 
+
+File transfer         : WinSCP (used during testing)
+
+----------------------------------------------------------------------------------------
+
+This project was created as dissertation project (Jan 2026 - May 2026) by Eva Martens.
 
 The system combines aspects of computer vision and game code to create an application 
-that allows users to prototype a 3D phantasy world map, without ever having used a game
-engine or 3D modelling before, ideal for DMs leading table top RPGs. 
-The idea is that the user creates a "2D map" on a 32x32 green lego plate, that they
-poplute with 8 seperate features. The system uses thresholding, segmentation,  
-feature and colour detection to differentiate between bricks and uses that data
-to spawn corresponding features onto the map.
+that allows users to prototype a 3D fantasy world map, without ever having used a game
+engine or 3D modelling before, ideal for DMs leading table top RPGs or level prototyping. 
 
-Unreal Engine 5 was chosen as medium for this project do to it's powerful graphical
+The idea is that the user creates a "2D map" on a 32x32 green lego plate, that they
+poplute with 8 seperate colored blocks. The computer vision system constists of a custom built camera system, 
+which takes 4 HDR images to account for varrying lighting conditions, and a CMake application to process
+the information using OpenCV C++.
+
+Example of an early testing plate
+<img width="857" height="1017" alt="HDR_early_example_lego_plate" src="https://github.com/user-attachments/assets/27333de2-e6ea-4c0a-99c0-59b3ee070661" />
+
+Example of in-development debug screenshot mapping colours to the procedural mesh inside unreal engine through PCG texture projection
+<img width="1173" height="486" alt="ExampleColourMappingOntoProceduralMesh" src="https://github.com/user-attachments/assets/7e5b44a7-78a1-4fc3-9980-af8fdf44c38a" />
+
+The CMake application uses an algorithmic approach applying thresholding, segmentation,  
+feature and colour detection to locate the lego plate in the images and then differentiates between bricks, using that data to create:
+1) A PNG file mapping each pixels color to the relative location of the correspondin brick 
+2) A .csv file containing pixelvalues of a height map generated with the image information
+3) A persistent error log file, which the user can choose to reset at the start of the application or not
+4) Consol error messages as well as warnings for various parts of the application so failure can be investigated
+
+The CMake applications color detection was based of a literature review and heavily tested and achieves high overall
+classification accuracy in varying light environments.
+
+Unreal Engine 5 was chosen as medium for this project due to it's powerful graphical
 capibilities and incredible PCG (procedural content generation) plugins, allowing 
 each generated world to be unique. 
+3D assets were taken from the FAB market place and liscensed under the "Personal Project" common liscense. 
+A full list of Assets used is made available here: [TO DO - add asset ref doc] 
 
-Many concepts used in this project are transferable to other similar projects. 
-Real-world scenarios include prototyping for games or visualising worlds for 
-story telling purposes. 
+Heads up: This is not a light weight application. Both computer vision and UE5 are resource intensive. 
+The computer vision CMake application for example uses expensive logic for a custom implementation of a colourspace (which significantly improved detection accuracy), which is why the system is not designed to run in paralell in the current version. 
 
-Heads up: While the code has been optimised for performance, this is not a light weight
-application. Please read this guide carefully & also refer to:
-
+For further guidance on hardware requirements please refer to:
 **https://dev.epicgames.com/documentation/en-us/unreal-engine/hardware-and-software-specifications-for-unreal-engine**
 
-The computer vision application can be a stand alone app and is platform independent and 
-cross-compilabe through CMAKE, though this might require adjusting the CMakeLists.txt 
-files and downloading and installing the corresponding compiler versions. 
-
-Unreal Engine 5 natively supports cross-platform compilation. 
+All parts of this project can easily be converted into stand alone applications. Additionally, they are (mostly) platform independent and 
+cross-compilabe (though this does require accomodating the various compiler versions needed for CMake, UE5, and the Rasberry Pi 5 OS you are using).
 
 ```
                -,,,__
@@ -51,6 +90,21 @@ Unreal Engine 5 natively supports cross-platform compilation.
               ,'---\ \              ,---`,;,
                     ,,,
 ```
+
+----------------------------------------------------------------------------------------
+ARCHITECTURE
+----------------------------------------------------------------------------------------
+
+Visual Studio Code is reccomended as code editor with ReSharper (perfect for Unreal 
+Engine 5 C++) as plug-in. Intellisense does not comprehend Unreal Engine 5 
+specific project structure and use of C++ macros well. 
+
+Thonny editor as interface for the python scripts on the Rasberry Pi 5 is sufficent and 
+should come pre-installed through the operating system imaging tool.
+
+Unreal Engine editor 5.7 was originally used to create this project. Unreal Engine 
+5.4 or above should also work, as all PCG plugin content used was available for that version
+of the engine. 
 
 ----------------------------------------------------------------------------------------
 Video Demo of game logic
@@ -84,34 +138,6 @@ https://github.com/user-attachments/assets/1c35d1b3-d765-4049-8ac2-68d95e6e7b85
 
 https://github.com/user-attachments/assets/6de279ba-5a36-45a1-bc04-062d8cb887a3
 
-----------------------------------------------------------------------------------------
-ARCHITECTURE
-
-----------------------------------------------------------------------------------------
-                                 CORE TECHNOLOGIES
-----------------------------------------------------------------------------------------
-
-PYTHON 3          : FLASK, OPEN CV 2, PICAMERA 2
-
-C++ 20 or 23      : CMAKE, OPEN CV 4, GCC
-
-XML               : YAML 
-
-UNREAL ENGINE 5.7 : PCG, 
-
-File transfer     : WinSCP
-
-----------------------------------------------------------------------------------------
-Visual Studio Code is reccomended as code editor with ReSharper (perfect for Unreal 
-Engine 5 C++) as plug-in. Intellisense does not comprehend Unreal Engine 5 
-specific project structure and use of C++ macros well. 
-
-Thonny editor as interface for the python scripts on the Rasberry Pi 5 is sufficent and 
-should come pre-installed through the operating system imaging tool.
-
-Unreal Engine editor 5.7 was originally used to create this project. Unreal Engine 
-5.4 is the minnimum requirement due to the projects use of certain PCG content not 
-available in earlier versions.
 
 ----------------------------------------------------------------------------------------
           Prerequisits - Camera system - Rasberry Pi 5 with camera module 3
