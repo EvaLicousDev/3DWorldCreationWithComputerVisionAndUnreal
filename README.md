@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------------
-COMPUTER VISION TABLETOP RPG MAP CREATOR TOOL SETUP GUIDE
+COMPUTER VISION TABLETOP RPG MAP CREATOR  -  SETUP GUIDE
 ----------------------------------------------------------------------------------------
-Last updated 10.03.26 (Spellchecked)
+Last updated 30.04.26 (Added demo videos for game logic)
 
 Thank you for reading the set-up guide! This document covers system purpose, achitecture
 and technologies, and should enable any reader to navigate the repository & possibly 
@@ -51,6 +51,38 @@ Unreal Engine 5 natively supports cross-platform compilation.
               ,'---\ \              ,---`,;,
                     ,,,
 ```
+
+----------------------------------------------------------------------------------------
+Video Demo of game logic
+----------------------------------------------------------------------------------------
+Spawning the procedural mesh with Blueprint (BP) Actor: 
+
+https://github.com/user-attachments/assets/4513421f-a3d4-4266-a705-c57610de68d2
+
+Setting mesh collisions, box collision around terraine for the PCG graph and the material
+
+https://github.com/user-attachments/assets/40a71b87-bf25-4b4f-9f0e-27625c3b99d7
+
+Using Data Assets and BP Structs to dynamically load the texture file at runtime for texture sampling
+
+https://github.com/user-attachments/assets/e3e5d565-fadf-4542-a600-e199214062bb
+
+Triggering the PCG Graph
+(Comment: The warning on the node that turns spatial data into bounds is irrelevant, as the graph generation is triggered at runtime, when there are points available.)
+
+https://github.com/user-attachments/assets/89d2a087-c90d-43ef-8ee0-08b0e93813f8
+
+PCG Graph part 2: Texture projection and point filtering by colour to create bioms seperate
+
+https://github.com/user-attachments/assets/0f5607c4-92bc-470f-8c9e-ca008362c204
+
+End result: Game spawning terrain, sampling the surface, projecting points onto the surface and then executing logic per biom
+(Sped up and cut into parts due to file size restrictions)
+
+https://github.com/user-attachments/assets/1c35d1b3-d765-4049-8ac2-68d95e6e7b85
+
+
+https://github.com/user-attachments/assets/6de279ba-5a36-45a1-bc04-062d8cb887a3
 
 ----------------------------------------------------------------------------------------
 ARCHITECTURE
@@ -153,3 +185,4 @@ Never use any code you do not understand.
 
 If you are using my code and you made it this far, great! Thank you for taking the time and I hope 
 you found what you were looking for. 
+------------------------------------------------------------------------------------------------
