@@ -27,7 +27,7 @@ C++ 20 or 23          : CMAKE, OPEN CV 4, GCC
 
 XML                   : YAML 
 
-UNREAL ENGINE 5.4 - 7 : PCG content plugin, Geometry Script Plugin, Procedural Mesh Component Plugin 
+UNREAL ENGINE 5.4 - 5.7 : PCG content plugin, Geometry Script Plugin, Procedural Mesh Component Plugin 
 
 File transfer         : WinSCP (used during testing)
 
