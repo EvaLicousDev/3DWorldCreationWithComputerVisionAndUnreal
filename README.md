@@ -12,9 +12,9 @@ It also includes a video breakdown of the core logic implmented in UE5 to spawn 
 ----------------------------------------------------------------------------------------
 PROJECT STAGE
 ----------------------------------------------------------------------------------------
-Rasberry Pi 5 Camera System                   - Version 1 - complete
-Algorithmic Computer Vision CMake Application - Version 1 - complete
-Unreal Engine 5 Map creation game instnace    - Proof of concept achieved - in progress
+* Rasberry Pi 5 Camera System                   - Version 1 - complete
+* Algorithmic Computer Vision CMake Application - Version 1 - complete
+* Unreal Engine 5 Map creation game instnace    - Proof of concept achieved - in progress
 
 Overall: Proof of concept achieved
 ----------------------------------------------------------------------------------------
