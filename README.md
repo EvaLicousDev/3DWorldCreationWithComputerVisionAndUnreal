@@ -68,8 +68,11 @@ each generated world to be unique.
 
 <img width="960" height="454" alt="Screenshot 2026-05-03 003606" src="https://github.com/user-attachments/assets/27b3c7fe-ff39-438a-a89b-e8708a981228" />
 
-3D assets were taken from the FAB market place and liscensed under the "Personal Project" common liscense. 
-A full list of Assets used is made available here: [TO DO - add asset ref doc] 
+3D assets were taken from the FAB market place and liscensed under the "Personal Project" common liscense.
+They are NOT included in this repository. 
+A full list of Assets that were used is made available here: [TO DO - add asset ref doc] 
+Please feel encouraged to check them out and support the various creators and their incredible work 
+as it is people like them providing assets for projects like this, that make work like this possible!
 
 Heads up: This is not a light weight application. Both computer vision and UE5 are resource intensive. 
 The computer vision CMake application for example uses expensive logic for a custom implementation of a colourspace (which significantly improved detection accuracy), which is why the system is not designed to run in paralell in the current version. 
