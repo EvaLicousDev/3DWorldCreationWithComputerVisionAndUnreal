@@ -17,6 +17,7 @@ PROJECT STAGE
 * Unreal Engine 5 Map creation game instnace    - Proof of concept achieved - in progress
 
 Overall: Proof of concept achieved
+<img width="1346" height="483" alt="Screenshot 2026-05-02 105024" src="https://github.com/user-attachments/assets/30f71f6c-66d0-4660-b095-4c9d20a49034" />
 ----------------------------------------------------------------------------------------
                                  CORE TECHNOLOGIES
 ----------------------------------------------------------------------------------------
@@ -33,7 +34,8 @@ File transfer         : WinSCP (used during testing)
 
 ----------------------------------------------------------------------------------------
 
-This project was created as dissertation project (Jan 2026 - May 2026) by Eva Martens.
+This project was created as as partial fulfilment of a BSc degree in
+Computer Science with integrated Year in the Industry (G401F) (Jan 2026 - May 2026) by Eva Martens.
 
 The system combines aspects of computer vision and game code to create an application 
 that allows users to prototype a 3D fantasy world map, without ever having used a game
@@ -63,6 +65,11 @@ classification accuracy in varying light environments.
 Unreal Engine 5 was chosen as medium for this project due to it's powerful graphical
 capibilities and incredible PCG (procedural content generation) plugins, allowing 
 each generated world to be unique. 
+
+<img width="960" height="454" alt="Screenshot 2026-05-03 003606" src="https://github.com/user-attachments/assets/27b3c7fe-ff39-438a-a89b-e8708a981228" />
+
+<img width="1173" height="486" alt="ExampleColourMappingOntoProceduralMesh" src="https://github.com/user-attachments/assets/5b2cce63-1960-444c-a942-082f2d62c8cc" />
+
 3D assets were taken from the FAB market place and liscensed under the "Personal Project" common liscense. 
 A full list of Assets used is made available here: [TO DO - add asset ref doc] 
 
