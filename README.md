@@ -68,8 +68,6 @@ each generated world to be unique.
 
 <img width="960" height="454" alt="Screenshot 2026-05-03 003606" src="https://github.com/user-attachments/assets/27b3c7fe-ff39-438a-a89b-e8708a981228" />
 
-<img width="1173" height="486" alt="ExampleColourMappingOntoProceduralMesh" src="https://github.com/user-attachments/assets/5b2cce63-1960-444c-a942-082f2d62c8cc" />
-
 3D assets were taken from the FAB market place and liscensed under the "Personal Project" common liscense. 
 A full list of Assets used is made available here: [TO DO - add asset ref doc] 
 
