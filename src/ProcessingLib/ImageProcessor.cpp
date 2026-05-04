@@ -22,20 +22,21 @@ void ImageProcessing::ImageProcessor::setWhiteBrick(cv::Mat& image)
 
 void ImageProcessing::ImageProcessor::addToHeightMap(const cv::Mat& info)
 {
-    //for a 4km x 4km map we need 4000 x 4000 px in unreal: we use 1px for 1 m^2
     cv::Mat infoReshaped;
     cv::resize(info, infoReshaped, cv::Size(sc_pixelsInHeightMap,sc_pixelsInHeightMap)); 
-    if (heightMap == nullptr)
+    if (m_heightMap == nullptr)
     {
-        heightMap = std::make_shared<cv::Mat>(infoReshaped);
+        m_heightMap = std::make_shared<cv::Mat>(infoReshaped);
     }
     else
     {
+        // we add the different layers of colours to create "noise" from the processing of the images so the output terrain 
+        // is coherent with the designers vision and placing of the lego features
         cv::Mat added; 
-        cv::add(*heightMap, infoReshaped, added);
+        cv::add(*m_heightMap, infoReshaped, added);
         cv::normalize(added,added,0,255);
-        heightMap.reset();
-        heightMap = std::make_shared<cv::Mat>(added);
+        m_heightMap.reset();
+        m_heightMap = std::make_shared<cv::Mat>(added);
     }
 }
 
@@ -55,6 +56,9 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     cv::Mat brickAreaCopy; 
     if (showResult) brickArea.copyTo(brickAreaCopy); 
 
+    auto mserMask = this->getMSERMask(brickArea,false); //repeated thresholding algorithm built into open CV
+
+    /*
     cv::Mat brickChannels[3];
     cv::split(brickArea, brickChannels);
     cv::Mat brickMaskReddishColours;
@@ -73,10 +77,17 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     this->getContourData(brickMaskBluishColours, false);
     auto rectanglesPtrBlues = this->getRectangles();
 
-    auto bricks = std::vector<cv::Rect>();
-    std::shared_ptr<std::vector<cv::Rect>> presumedBricks[2];
     presumedBricks[0] = rectanglesPtrReds;
     presumedBricks[1] = rectanglesPtrBlues;
+    */ 
+
+    if (demo)  cv::imshow("MSER Mask for thresholding regions", mserMask);
+    auto bricks = std::vector<cv::Rect>();
+    std::shared_ptr<std::vector<cv::Rect>> presumedBricks[1];
+
+    this->getContourData(mserMask, true);
+    auto brickRectangles = this->getRectangles(); 
+    presumedBricks[0] = brickRectangles; 
 
     for (auto rect : presumedBricks)
     {
@@ -92,7 +103,7 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
                     auto smallerRectTLX = rectangleInstance.tl().x + (rectangleInstance.width *0.8);
                     auto smallerRectTLY = rectangleInstance.tl().y + (rectangleInstance.height *0.8);
                     auto smallerRectBRX = rectangleInstance.br().x - (rectangleInstance.width *0.8);
-                    auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height * 0.8 );
+                    auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height *0.8);
                     cv::Rect smallerRect(cv::Point(static_cast<int>(smallerRectTLX), static_cast<int>(smallerRectTLY)), cv::Point(static_cast<int>(smallerRectBRX), static_cast<int>(smallerRectBRY)));
 
                     if (showResult) cv::rectangle(brickAreaCopy, rectangleInstance, CV_RGB(255,0,255), 3);
@@ -125,11 +136,11 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     return bricks; 
 }
 
-// Uses cv::Mat reference to resize to sc_pixelsHeightMap^2 and then converts to Uint 16 type image, then outputs "heightMap.png" and returns cv::Mat if needed.
+// Uses cv::Mat reference to resize to sc_pixelsHeightMap^2 and then converts to Uint 16 type image, then outputs "m_heightMap.png" and returns cv::Mat if needed.
 cv::Mat ImageProcessing::ImageProcessor::createHeightMapPNG(cv::Mat& heightMapData, const char* heightMapOutPutPath)
 {
     cv::resize(heightMapData, heightMapData, cv::Size(sc_pixelsInHeightMap, sc_pixelsInHeightMap));
-    heightMapData.convertTo(heightMapData, CV_16U, 255.0); //Desired file format for heightmaps for UE5 editor landscape system
+    heightMapData.convertTo(heightMapData, CV_16U, 255.0); //Desired file format for heightmaps for UE5 editor landscape system - note that this was used in development but the end product uses a csv file to get the height data and produce a procedural mesh
     cv::imwrite(heightMapOutPutPath, heightMapData);
     return heightMapData;
 }
@@ -230,7 +241,7 @@ cv::Mat ImageProcessing::ImageProcessor::getMSERMask(cv::Mat unblurredImage, boo
 {
     cv::Mat mserMask; 
     mserMask.create(unblurredImage.rows, unblurredImage.cols, CV_8UC1);
-    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 9, ((unblurredImage.cols*unblurredImage.rows)/2),0.25,0.01, 500, 1.01, 0.003, 9);
+    cv::Ptr<cv::MSER> mserAlgorithm = cv::MSER::create(5, 9, ((unblurredImage.cols*unblurredImage.rows)/4),0.28,0.01, 500, 1.01, 0.003, 9);
 
     std::vector<std::vector<cv::Point> > mserContours;
     std::vector<cv::Rect> mserRegions;
@@ -540,7 +551,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
     }
 
     // create point in middle. If we debug show this frame, it will be displayed in a reddish shade
-    auto largest = cv::boundingRect(contours[maxContourID]);
+    auto largest  = cv::boundingRect(contours[maxContourID]);
     m_biggestRect = std::make_shared<cv::Rect>(largest);
     cv::Point2f centerOfLargest(static_cast<float>((largest.tl().x + largest.width / 2)), static_cast<float>((largest.tl().y + largest.height / 2)));
 
