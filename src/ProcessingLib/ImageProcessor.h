@@ -28,7 +28,9 @@ namespace ImageProcessing
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
-    static const constexpr int sc_pixelsInHeightMap  = 2017*2; //https://dev.epicgames.com/documentation/en-us/unreal-engine/landscape-technical-guide-in-unreal-engine
+    // previous scale was adjusted in system testing for efficency reasons
+    // static const constexpr int sc_pixelsInHeightMap  = 2017*2; //https://dev.epicgames.com/documentation/en-us/unreal-engine/landscape-technical-guide-in-unreal-engine
+    static const constexpr int sc_pixelsInHeightMap = 400; 
     static const constexpr int sc_coloursToIdentify  = 8;
     static const constexpr int sc_greenBlueLowerAxis = -127;
     static const constexpr int sc_greenBlueUpperAxis = 0;
@@ -46,16 +48,16 @@ namespace ImageProcessing
          *
          * Theory:
          * The RGB space provides 256 x 256 x 256 colours over three channels (approximately 16 mil).
-         * Therefor we want to reduce the number of colours processed down to the minimum needed. For this we
-         * divide the RGB space into "X" components where "X" stands for the number of configurable colours
-         * for the Lego map we are trying to analyse.
+         * Therefor we want to reduce the number of colours processed down to the minimum needed. 
+         * Additionally using device independent colour spaces and colour spaces that match shades to unique value helps make detection more reliable.
+         * 
+         * Colour spaces used to identify bricks are primarely LAB and LCH. Please also view BrickCVEnums/BrickColourEnum.h for more comments.
+         * LAB was chosen due to the initial literature review and testing & LCH was added to improve detection further
          *
          * Approach:
          * We first apply some processing to identify the position of the boards from the lego bricks.
          * Then we isolate a mask for an area of interest over the "example plate" to apply some thresholding for colour values. 
-         * This way we can dynamically set the colour ranges, allowing for slightly more resiliance to bad lighting. 
-         * Note that colours are chosen in a way that allows for high contrast during processing. The AOI mask for example uses 
-         * a transition from white to black to identify the AOI. 
+         * This way we can dynamically set the colour ranges rather than tying them to set values, allowing for slightly more resiliance to bad lighting. 
          */
 
     public:
@@ -64,6 +66,7 @@ namespace ImageProcessing
         {
             if (!imageOfLego->empty())
             {
+             //   in early development this was used to diplay and visually test the images loaded by this application
              //   visualiserInstance = std::make_unique<ColourSpaceVisualiser>(in_image); 
             }
         }
@@ -73,17 +76,20 @@ namespace ImageProcessing
             visualiserInstance.release();
         }
 
-        std::weak_ptr<cv::Rect> getPlateRectangle() { return m_biggestRect; }
+        std::weak_ptr<cv::Rect>  getPlateRectangle() { return m_biggestRect; }
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
-        cv::Rect findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
-        std::vector<cv::Rect> findBrickLocations(cv::Mat& brickArea, bool showResult = false); 
-        cv::Mat createHeightMapPNG(cv::Mat& heightMapData, const char* heightmapOutputPath); 
+        cv::Rect                 findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
+        std::vector<cv::Rect>    findBrickLocations(cv::Mat& brickArea, bool showResult = false); 
+        cv::Mat                  createHeightMapPNG(cv::Mat& heightMapData, const char* heightmapOutputPath); 
+        void                     addToHeightMap(const cv::Mat& info);
+        std::weak_ptr<cv::Mat>   getHeightMap() { return m_heightMap; }
 
         cv::Point2f findTL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findTR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
 
+        // DEPRECATED
         cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
         cv::Rect findRectWithLargestVolium(const std::vector<cv::Rect>& boxes);
@@ -91,10 +97,10 @@ namespace ImageProcessing
         cv::Rect findSquareIsh(const std::vector<cv::Point>& box);
         cv::Rect findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
         cv::Rect getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult); 
-        void setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
+        void     setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
+        //---------------
 
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);
-       // cv::Mat customSobelEdges(cv::Mat& input1, cv::Mat& input2, cv::Mat& input3);
         cv::Mat applyCannyToBGR(cv::Mat& blurredBGR);
         cv::Mat applyCannyTo1D(cv::Mat& blurredGrey, int threshold);
         void    setContouringThresholds(cv::Mat& blurredGreyscale);
@@ -104,7 +110,8 @@ namespace ImageProcessing
         cv::Mat createThresholdMask(cv::Mat& greyImage);
         cv::Mat backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold); 
         
-        //image processing functions using pixle wise operations
+        // early development [DEPRECATED] image processing functions using pixle wise operations to reduce colour range
+        // was fased out as the decision to not controll lighting made using this methodolgy intorduce too unreliable results
         cv::Mat naiveRgbColourSpaceReduction(cv::Mat& image,   int divideBy = 16);
         cv::Mat naiveRgbColourSpaceReduction2(cv::Mat& image,  int divideBy = 16);
         cv::Mat bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy = 16);
@@ -118,10 +125,9 @@ namespace ImageProcessing
 
         //debug functions for development
         cv::Mat& getMainImage() { return *imageOfLego; }
-
-        void    debugInfo(cv::Mat& image);
-        cv::Mat getMSERMask(cv::Mat unblurredImage, bool showAreas = false);
-        cv::Mat createMapWithContoursAndLABchannel(const cv::Mat& green, const cv::Mat& mser);
+        void     debugInfo(cv::Mat& image);
+        cv::Mat  getMSERMask(cv::Mat unblurredImage, bool showAreas = false);
+        cv::Mat  createMapWithContoursAndLABchannel(const cv::Mat& green, const cv::Mat& mser);
 
         cv::Mat                                               getDrawnContours() { return drawenContours; }
         std::shared_ptr<cv::Mat>                              getLegoPXMask()    { return legoPXMask;  }
@@ -133,23 +139,20 @@ namespace ImageProcessing
         void setWhiteBrick(cv::Mat& image);
         std::shared_ptr<cv::Mat> getBrickSample() { return imageOfBricks; }
 
-        void addToHeightMap(const cv::Mat& info); 
-        std::weak_ptr<cv::Mat> getHeightMap() { return heightMap;  }
     private:
         bool isWithinTollerance(cv::Rect& output); 
 
-       // cv::Mat bestEdges(cv::Mat& lumEdges, cv::Mat& axEdges, cv::Mat& byEdges);
-        int leftWhiteMarkerTL_X = -1; 
+        int leftWhiteMarkerTL_X  = -1; 
         int rightWhiteMarkerTR_X = -1; 
 
-        std::shared_ptr<cv::Mat> imageOfLego = nullptr; 
+        std::shared_ptr<cv::Mat> imageOfLego   = nullptr; 
         std::shared_ptr<cv::Mat> imageOfBricks = nullptr;
-        std::shared_ptr<cv::Mat> whiteBrick = nullptr;
-        std::shared_ptr<cv::Mat> heightMap = nullptr;
+        std::shared_ptr<cv::Mat> whiteBrick    = nullptr;
+        std::shared_ptr<cv::Mat> m_heightMap   = nullptr;
         std::unique_ptr<ColourSpaceVisualiser> visualiserInstance = nullptr; 
 
         std::shared_ptr<cv::Mat> legoPXMask = nullptr;
-        std::shared_ptr<cv::Mat> mserMask = nullptr;
+        std::shared_ptr<cv::Mat> mserMask   = nullptr;
 
         std::shared_ptr<cv::Mat> image_L = nullptr;
         std::shared_ptr<cv::Mat> image_A = nullptr;
@@ -165,6 +168,5 @@ namespace ImageProcessing
         double controurThreshMax    = 0;
         double controurThreshMin    = 0;
         double controurThreshMiddle = 0;
-        //cv::Mat createColourLocationImageBW(int maxDistance, const cv::Vec3b& tragetColour);
     };
 }
