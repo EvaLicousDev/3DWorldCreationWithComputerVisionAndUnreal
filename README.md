@@ -155,15 +155,16 @@ Updating the system and all subsequent package downloads can take up to 2 days.
 
 If rebuilding this project the following setup is recommended for the rasberry pi:
 - fully updated Pi OS (set up headless operation through imanging tool with PC on same network, enable "Rasberry Pi connect")
-- install python 3 (or latest)
-- install pip install as package manager
-    - pip install open cv 2 (python verion)
-    - pip install picamera 2
-    - pip install flask 
-- install libcamer & rpi camer packages
+    - if you are using the latest version of PiOS through the official Rasberry Pi imaging tool, "sudo apt update && sudo apt upgrade -y" will result in many of the following steps possibly being ommitable, but verify the following installations regardless:
+        - install python 3 (or latest)
+        - install pip install as package manager
+            - pip install open cv 2 (python verion)
+            - pip install picamera 2
+            - pip install flask 
+        - install libcamer & rpi camer packages
 
 If you want to connect wirelessly by setting up a flask server
-- install ngrok for easy & secure server connection
+- install ngrok or any other reverse-proxy service for easy & secure server connection
     - ngrok accounts are free, for more permanent architecture a paid account is recommend 
     - connection can use password protections (less secure) or mTLS (using custom certificates)
     - if the system only ever gets accessed form one location a static IP can be set as trusted connection
