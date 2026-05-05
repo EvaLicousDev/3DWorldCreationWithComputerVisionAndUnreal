@@ -30,7 +30,7 @@ XML                     : YAML
 
 UNREAL ENGINE 5.4 - 5.7 : PCG content plugin, Geometry Script Plugin, Procedural Mesh Component Plugin 
 
-File transfer           : WinSCP (used during testing), Putty (, SSH, PSCP)
+File transfer           : WinSCP (used during testing), Putty (, SSH, PSCP), Samba
 
 ----------------------------------------------------------------------------------------
 
@@ -156,6 +156,8 @@ Updating the system and all subsequent package downloads can take up to 2 days.
 If rebuilding this project the following setup is recommended for the rasberry pi:
 - fully updated Pi OS (set up headless operation through imanging tool with PC on same network, enable "Rasberry Pi connect")
     - if you are using the latest version of PiOS through the official Rasberry Pi imaging tool, "sudo apt update && sudo apt upgrade -y" will result in many of the following steps possibly being ommitable, but verify the following installations regardless:
+        - install samba
+        - install wsdd (or wsdd2 for debian "trixie")
         - install python 3 (or latest)
         - install pip install as package manager
             - pip install open cv 2 (python verion)
