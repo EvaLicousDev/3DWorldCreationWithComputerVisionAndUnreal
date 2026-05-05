@@ -22,15 +22,15 @@ Overall: Proof of concept achieved
                                  CORE TECHNOLOGIES
 ----------------------------------------------------------------------------------------
 
-PYTHON 3              : FLASK, OPEN CV 2, PICAMERA 2
+PYTHON 3                : FLASK, OPEN CV 2, PICAMERA 2
 
-C++ 20 or 23          : CMAKE, OPEN CV 4, GCC
+C++ 20 or 23            : CMAKE, OPEN CV 4, GCC
 
-XML                   : YAML 
+XML                     : YAML 
 
 UNREAL ENGINE 5.4 - 5.7 : PCG content plugin, Geometry Script Plugin, Procedural Mesh Component Plugin 
 
-File transfer         : WinSCP (used during testing)
+File transfer           : WinSCP (used during testing), Putty (, SSH, PSCP)
 
 ----------------------------------------------------------------------------------------
 
@@ -153,26 +153,34 @@ https://github.com/user-attachments/assets/6de279ba-5a36-45a1-bc04-062d8cb887a3
 Setting up the Rasberry Pi with all updates is recommended for security purposes! 
 Updating the system and all subsequent package downloads can take up to 2 days. 
 
-
 If rebuilding this project the following setup is recommended for the rasberry pi:
 - fully updated Pi OS (set up headless operation through imanging tool with PC on same network, enable "Rasberry Pi connect")
 - install python 3 (or latest)
 - install pip install as package manager
     - pip install open cv 2 (python verion)
-    - pip install flask
     - pip install picamera 2
+    - pip install flask 
 - install libcamer & rpi camer packages
+
+If you want to connect wirelessly by setting up a flask server
 - install ngrok for easy & secure server connection
     - ngrok accounts are free, for more permanent architecture a paid account is recommend 
     - connection can use password protections (less secure) or mTLS (using custom certificates)
     - if the system only ever gets accessed form one location a static IP can be set as trusted connection
+ 
+If you want to connect via ethernet cable with SSH (recommended)
+- install putty on your pc or laptop
+- change your network sharing adapter settings:
+    - select ethernet -> properties -> Ipv4 settings -> declare a static IP adress
+    - Note: On windows 11, if you also use ICS (internet connection forwarding) the ethernet connections IP adress may be changed
       
 ----------------------------------------------------------------------------------------
             Getting the images from the Rasberry Pi 5
 ----------------------------------------------------------------------------------------
 There are several ways to get the images from the Rasberry Pi 5, including connecting 
-via an ethernet cable. We do not have to set up a server for the RPI, this was just 
-the chosen method based on the system usecases outlined in the dissertation. 
+via an ethernet cable. You do not have to set up a server for the RPI. 
+
+
 
 WinSCP allows for simple file transfer between Windows PCs and the Linux based
 PiOS, and can be setup easily, if you are running and able to access your PiOS 
