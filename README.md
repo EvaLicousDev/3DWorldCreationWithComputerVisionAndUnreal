@@ -190,7 +190,7 @@ PiOS, and can be setup easily, if you are running and able to access your PiOS
 ------------------------------------------------------------------------------------------------
 *IMPORTANT: NETWORKING SECURITY*
 
-To set up the RPI as server, it's recommended to take a few steps first:
+If you set up a server using NGrok - To set up the RPI as server, it's recommended to take a few steps first:
 - Change the standard SSH port on your Pi form 20 to something else between 10000 - 60000
   This is so automated attacks don't have easy access to your Rasberry Pi
 - Ensure you have a long, secure password on your Pi Connect account!
@@ -202,8 +202,6 @@ To set up the RPI as server, it's recommended to take a few steps first:
 - You do not need to disable your firewall or change router settings. Ngrok allows you to securely forward
   your port without needing to poke a whole in your firewall.
 
-This project uses a Restful server architecture (RestAPI), which just means we are not 
-storing any session data on the rasberry pi 5. 
 Make sure you have enough free memory on your rasberry pi 5 to take the HDR images and 
 compress them while running the server scripts. 
 
@@ -214,8 +212,6 @@ this repository send compressed image data. Because of this set up your Rasberry
 should not have to deal with any additional junk data floating around. 
 
 MAKE SURE TO CHECK MEMORY USAGE WHEN RUNNING THE SCRIPTS ON YOUR DEVICE THE FIRST TIME. 
-
-Better safe than having to re-setup the whole thing!
 
 Should you have trouble setting up the server, you can also flush the port through the 
 command line but BE CAREFUL NOT TO ACCIDENTALLY FLUSH A PORT YOU ARE USING FOR ANYTHIG ELSE.
