@@ -8,7 +8,7 @@ from datetime import datetime
 
 SECONDS_PER_HOUR = 3600
 FRAM_VALUE_ADJUSTMENT_RATIO = 3.0
-OUTPUT_DIR = Path("/home/evaliciousdev/imagesForApplication")
+OUTPUT_DIR = Path("/home/evaliciousdev/cvImages") #shared folder for samba server acessible by windows
 
 __name__ = "camera_setup_module"
 
@@ -16,7 +16,7 @@ DAYLIGHT      = "Daylight"
 TWILIGHT      = "Twilight"
 HIGHLIGHT     = "High Light"
 SUPERLOWLIGHT = "Super LowLight"
-imageNames    = [DAYLIGHT, TWILIGHT,HIGHLIGHT, SUPERLOWLIGHT]
+imageNames    = [DAYLIGHT, TWILIGHT, HIGHLIGHT, SUPERLOWLIGHT]
 
 #------------------------------------------------------------------------------------
 # ----------------------------------CAMERA SETTINGS----------------------------------
@@ -82,8 +82,8 @@ class Cam_Controls:
         # this cannot completly offse glare, but does help a lot 
         controls_bright_light = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
-                            "ExposureTime": self.exposure_normal*0.9,
-                            "AnalogueGain": self.gain_normal*1.2,
+                            "ExposureTime": int(self.exposure_normal*0.9),
+                            "AnalogueGain": int(self.gain_normal*1.2),
                             "ColourGains":(0.0,0.0),
                             "AwbEnable": True,
                             "AwbMode": 2, #Flurecent
@@ -94,8 +94,8 @@ class Cam_Controls:
         # evenings and indoors 
         controls_twilight = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
-                            "ExposureTime": self.exposure_normal*1.2,
-                            "AnalogueGain": self.gain_normal,
+                            "ExposureTime": int(self.exposure_normal*1.2),
+                            "AnalogueGain": int(self.gain_normal),
                             "AwbEnable": False, #Colour gain is mutually exclusive with Awb modes
                             "Contrast":1.5,
                             "Saturation":1.3,
@@ -105,8 +105,8 @@ class Cam_Controls:
         #this one will result in very over exposed images in most light, but works well in darker setting
         controls_super_low_light = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
-                            "ExposureTime": self.exposure_normal*1.5,
-                            "AnalogueGain": self.gain_normal*1.2,
+                            "ExposureTime": int(self.exposure_normal*1.5),
+                            "AnalogueGain": int(self.gain_normal*1.2),
                             "AwbEnable": False, #Colour gain is mutually exclusive with Awb modes
                             "ColourGains":(1.2,1.2),
                             "Contrast":1.3,
@@ -136,11 +136,11 @@ class HDR_Img_Creator:
     output_image_normal = None
     
     #------------------------------------------------------------------------------------
-    def get_normal():
-        return output_image_HDR
+    def get_normal(self):
+        return self.output_image_normal
     #------------------------------------------------------------------------------------
-    def get_hdr():
-        return output_image_HDR
+    def get_hdr(self):
+        return self.output_image_HDR
     #------------------------------------------------------------------------------------
     def set_up_merge_modes(self, short, short2, normal, long, long2, long3):
         merge_super_low_light = [short2, normal, normal, long, long2, long3]
@@ -152,16 +152,18 @@ class HDR_Img_Creator:
                              HIGHLIGHT: merge_high_light,
                              SUPERLOWLIGHT: merge_super_low_light }
     #------------------------------------------------------------------------------------    
-    def merge_arrays(self, normal, capture_mode):
+    def merge_arrays(self, normal, capture_mode, filename):
         allInit = self.capture_arrays is not None and self.capture_mode is not None and self.image_name is not None and self.normal_name is not None and self.metadata_name is not None
         if allInit is not None:
-            #fetch the appropriate image list 
-            merging_mode = self.merge_modes[capture_mode]
+            merging_mode = self.merge_modes.get(capture_mode)
             #merge with Mertens merge algorithm and represent RGB colours as uints
             merger = cv2.createMergeMertens()
             merged_hdr = merger.process(merging_mode)
-            self.output_image_HDR    = np.clip(merged_hdr * 255).astype(np.uint8)
+            self.output_image_HDR    = np.clip((merged_hdr * 255), 0, 255).astype(np.uint8)
             self.output_image_normal = normal
+            
+            cv2.imwrite(f"{filename}", self.output_image_HDR)
+            #cv2.imwrite(f"normal_{capture_mode}", normal)
         else:
             raise("Trying to merge images, but capture array is empty. Capture mode: {self.capture_mode} Image name: {self.image_name}")
     
@@ -173,14 +175,14 @@ class HDR_Img_Creator:
                           "Long": array4,
                           "Longer": array5,
                           "Longest": array6}
-        self.image_name = filename
+        self.image_name = OUTPUT_DIR / f"hdr_{capture_mode}.jpg"
         self.normal_name = normal_name
         self.metadata_name = metadata_name
         self.capture_mode = capture_mode
         self.set_up_merge_modes(array1, array2, array3, array4, array5, array6)
         
         print("Creating HDR image...")
-        self.merge_arrays(array3, self.capture_mode)
+        self.merge_arrays(array3, self.capture_mode, self.image_name)
         return
     
     def __repr__(self) -> str:
@@ -195,7 +197,7 @@ class HDR_Img_Camera:
     __name__ = "HDR_Camera_Class"
         
     camera_instance = Picamera2()
-    configuration = camera_instance.create_video_configuration(main={"size":(1920,1080)})
+    configuration = camera_instance.create_video_configuration(main={"size":(1920,1080), "format":"RGB888"})
     metadata = None
     controls = None
     merge_mode = None
@@ -224,6 +226,7 @@ class HDR_Img_Camera:
     # The following function capitalises of this to gain the recommended values for normal image capture
     # and then creates an instance of the Cam_controls class
     def startCam(self):
+        
         # start and show camera so view can be adjusted
         self.camera_instance.start(show_preview=True)
         self.camera_instance.title_fields = ["ExposureTime", "AnalogueGain"]
@@ -245,6 +248,7 @@ class HDR_Img_Camera:
         
     #------------------------------------------------------------------------------------
     def capture_hdr_set(self):
+        self.camera_instance.configure(self.configuration)
         timestamp = datetime.now().strftime("Fram{frameNumber}_%H_%M_%S")
         metadata_timestamp = datetime.now().strftime("%d_%m_%H_M%")
         print(f"Capturing: {timestamp}")
@@ -256,11 +260,12 @@ class HDR_Img_Camera:
         modeIndex = 0
         for control_set in self.controls.get_controls():
             self.camera_instance.set_controls(control_set)
+            print(f"Camera Settings: {self.camera_instance.stream_configuration('main')}")
             
-            shortest_exposure = int(self.normal_exposure / FRAM_VALUE_ADJUSTMENT_RATIO)
-            short_exposure    = int(shortest_exposure*2)
-            long_exposure     = int(self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO)
-            longer_exposure   = int((self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO) + short_exposure)
+            shortest_exposure    = int(self.normal_exposure / FRAM_VALUE_ADJUSTMENT_RATIO)
+            short_exposure       = int(shortest_exposure*2)
+            long_exposure        = int(self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO)
+            longer_exposure      = int((self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO) + short_exposure)
             longest_exposure     = int(self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO * FRAM_VALUE_ADJUSTMENT_RATIO)
             time.sleep(0.5)
             
@@ -277,6 +282,7 @@ class HDR_Img_Camera:
             time.sleep(0.5)
             self.camera_instance.start()
             shortest = self.camera_instance.capture_array()
+            print(shortest.shape)
             self.camera_instance.stop()
             print(f" - captured Frame {frameNumber}")
             
@@ -333,8 +339,8 @@ class HDR_Img_Camera:
             #add to output
             new_hdr = creator.get_hdr()
             new_normal = creator.get_normal()
-            current_normal_images[imageNames[modeIndex]] = new_normal
-            current_hdr_images[imageNames[modeIndex]] = new_hdr
+            self.current_normal_images[imageNames[modeIndex]] = new_normal
+            self.current_hdr_images[imageNames[modeIndex]] = new_hdr
             print( f"---> captured and saved {imageNames[modeIndex]} for output" )
             modeIndex += 1
             
