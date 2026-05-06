@@ -12,7 +12,6 @@ from datetime import datetime
 
 try:
     camera = HDR_Img_Camera()
-    camera.startCam()
     print("Setup complete")
 
     # 4 HDR
