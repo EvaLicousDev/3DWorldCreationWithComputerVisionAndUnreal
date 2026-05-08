@@ -56,15 +56,17 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     cv::Mat brickAreaCopy; 
     if (showResult) brickArea.copyTo(brickAreaCopy); 
 
-    auto mserMask = this->getMSERMask(brickArea,false); //repeated thresholding algorithm built into open CV
-
-    /*
     cv::Mat brickChannels[3];
     cv::split(brickArea, brickChannels);
     cv::Mat brickMaskReddishColours;
     cv::Mat brickMaskBluishColours;
-    threshold(brickChannels[redOrBlueYellow], brickMaskReddishColours, 50, 255, cv::THRESH_BINARY);
-    threshold(brickChannels[blueOrLuminance], brickMaskBluishColours, 100, 255, cv::THRESH_BINARY);
+
+    brickMaskReddishColours = brickChannels[redOrBlueYellow] * 2; 
+    brickMaskBluishColours = brickChannels[blueOrLuminance] * 2;
+
+    threshold(brickMaskReddishColours, brickMaskReddishColours, 100, 255, cv::THRESH_BINARY);
+    threshold(brickMaskBluishColours, brickMaskBluishColours, 100, 255, cv::THRESH_BINARY);
+
     cv::medianBlur(brickMaskReddishColours, brickMaskReddishColours, 5); 
     cv::medianBlur(brickMaskBluishColours, brickMaskBluishColours, 5);
     if (demo) cv::imshow("Brick mask Reds", brickMaskReddishColours);
@@ -77,17 +79,16 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     this->getContourData(brickMaskBluishColours, false);
     auto rectanglesPtrBlues = this->getRectangles();
 
+    std::shared_ptr<std::vector<cv::Rect>> presumedBricks[2];
     presumedBricks[0] = rectanglesPtrReds;
     presumedBricks[1] = rectanglesPtrBlues;
-    */ 
 
-    if (demo)  cv::imshow("MSER Mask for thresholding regions", mserMask);
+    //if (demo)  cv::imshow("MSER Mask for thresholding regions", mserMask);
     auto bricks = std::vector<cv::Rect>();
-    std::shared_ptr<std::vector<cv::Rect>> presumedBricks[1];
 
-    this->getContourData(mserMask, true);
-    auto brickRectangles = this->getRectangles(); 
-    presumedBricks[0] = brickRectangles; 
+    //this->getContourData(mserMask, true);
+    //auto brickRectangles = this->getRectangles(); 
+    //presumedBricks[0] = brickRectangles; 
 
     for (auto rect : presumedBricks)
     {
@@ -98,12 +99,12 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
                 bool isBrickShaped = (rectangleInstance.height >= rectangleInstance.width * 1.9);
                 if ((((rectangleInstance.width + rectangleInstance.height) != 0) && isBrickShaped))
                 {
-
                     //shrink the rectangle to exclude unwanted pixls
                     auto smallerRectTLX = rectangleInstance.tl().x + (rectangleInstance.width *0.8);
                     auto smallerRectTLY = rectangleInstance.tl().y + (rectangleInstance.height *0.8);
                     auto smallerRectBRX = rectangleInstance.br().x - (rectangleInstance.width *0.8);
                     auto smallerRectBRY = rectangleInstance.br().y - (rectangleInstance.height *0.8);
+
                     cv::Rect smallerRect(cv::Point(static_cast<int>(smallerRectTLX), static_cast<int>(smallerRectTLY)), cv::Point(static_cast<int>(smallerRectBRX), static_cast<int>(smallerRectBRY)));
 
                     if (showResult) cv::rectangle(brickAreaCopy, rectangleInstance, CV_RGB(255,0,255), 3);
@@ -114,7 +115,7 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
                     for (auto brickRectangle : bricks)
                     {
                         // We check if the rectangles overlap 
-                        // for synatx refer to https://putuyuwono.wordpress.com/2015/06/26/intersection-and-union-two-rectangles-opencv/
+                        // for synatx explanation refer to https://putuyuwono.wordpress.com/2015/06/26/intersection-and-union-two-rectangles-opencv/
                         isInBricks = (smallerRect & brickRectangle).area() > 0;
                         if (isInBricks) dontPlace = true;
                     }
@@ -133,6 +134,7 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
         cv::imshow("Brick area rectangles", brickAreaCopy);
         cv::waitKey(0); 
     }
+
     return bricks; 
 }
 
@@ -550,6 +552,14 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
         }
     }
 
+    if (contours.size() == 0)
+    {
+        Errors::ErrorOutput(Errors::BrickCVErrors::NO_CONTOURS_FOUND, "An image we were trying to process has no contours found.");
+        if (showAllRect || showBlackMask) cv::imshow("No contours findable for this", orig); 
+        cv::waitKey; 
+        return std::vector<cv::Point2f>(); 
+    }
+
     // create point in middle. If we debug show this frame, it will be displayed in a reddish shade
     auto largest  = cv::boundingRect(contours[maxContourID]);
     m_biggestRect = std::make_shared<cv::Rect>(largest);
@@ -564,7 +574,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
 
     auto circumfrance = cv::arcLength(contours[maxContourID], true);
     std::vector<cv::Point2f> largestCorners;
-    cv::approxPolyDP(contours[maxContourID], largestCorners, circumfrance * 0.1, true); //epsilon is generous
+    cv::approxPolyDP(contours[maxContourID], largestCorners, circumfrance * 0.075, true); //epsilon is generous
 
     if (largestCorners.size() <= 4)
     {
@@ -585,6 +595,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
             {
                 orderdPoints[0] = cv::Point2f(point);
                 foundTopLeft = true;
+                break;
             }
         }
 
@@ -596,6 +607,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
             {
                 orderdPoints[1] = cv::Point2f(point);
                 foundTopRight = true;
+                break;
             }
         }
 
@@ -607,6 +619,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
             {
                 orderdPoints[2] = cv::Point2f(point);
                 foundBotRight = true;
+                break;
             }
         }
 
@@ -618,6 +631,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
             {
                 orderdPoints[3] = cv::Point2f(point);
                 foundBotLeft = true;
+                break;
             }
         }
 
@@ -871,6 +885,7 @@ cv::Mat ImageProcessing::ImageProcessor::applySobel(cv::Mat& mask, int k)
     cv::Sobel(mask, sobelx, CV_64F, 1, 0, k);
     cv::Sobel(mask, sobely, CV_64F, 0, 1, k);
     cv::magnitude(sobelx, sobely, gradient);
+
     // Convert to 8-bit image
     cv::convertScaleAbs(gradient, gradient);
     return gradient;

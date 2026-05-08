@@ -18,7 +18,7 @@ using namespace cv;
 using namespace ImageProcessing;
 
 // Image directory defined in CMake Lists file
-static const std::string sc_imageFilesPattern = std::string(IMAGE_DIR) + "/*.jpg";
+static const std::string sc_imageFilesPattern = string("Y:/LegoImages") + "/*.jpg";
 
 
 // IMPORTANT INFORMATION:
@@ -39,10 +39,10 @@ int main()
 
     const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png"; 
 
-    float dynThres_LowerBoundry_LAB  = 0.85; 
-    float dynThresh_UpperBoundry_LAB = 1.15;
-    float dynThres_LowerBoundry_LCH  = 0.98;
-    float dynThresh_UpperBoundry_LCH = 1.02;
+    float dynThres_LowerBoundry_LAB      = 0.85; 
+    float dynThresh_UpperBoundry_LAB     = 1.15;
+    float dynThres_LowerBoundry_LCH      = 0.98;
+    float dynThresh_UpperBoundry_LCH     = 1.02;
     float weightFactor_ChromaChannel_LCH = 0.3; 
 
     int outRowsCols = 40;
@@ -58,6 +58,9 @@ int main()
         ofs.close();
     }
 
+    //--------------------------------------------------------
+    // Based on https://stackoverflow.com/questions/16962430/calling-python-script-from-c-and-using-its-output
+
     //---------------------------------------------------------
     //Load image files
     ImageReader fileReader{};
@@ -68,8 +71,10 @@ int main()
     //Begin main processing loop - try and process an image and go to the next one if that fails
 
     bool success = false; 
+    int imagesTried = 0; 
     for(auto imagePtr : images)
     {
+        ++imagesTried; 
         if (auto strongPtr = imagePtr.lock())
         {
             cv::Mat imageToProcess = *strongPtr; 
@@ -93,7 +98,8 @@ int main()
             // for the dark green corner pieces. Best results are achieved if two rows of lego studs remain dark green on the side
             cv::Mat splitBGR[channels];
             cv::split(imageToProcess, splitBGR);
-            cv::Mat higherRedValueMask = splitBGR[redOrBlueYellow]; //we don't use a pointer bc we want to preserve imageToProcess
+            cv::Mat higherRedValueMask = splitBGR[redOrBlueYellow]; 
+            higherRedValueMask * 2;
             threshold(higherRedValueMask, higherRedValueMask, 50, 255, cv::THRESH_BINARY_INV);
             medianBlur(higherRedValueMask, higherRedValueMask, 9);
             threshold(higherRedValueMask, higherRedValueMask, 0, 100, cv::THRESH_BINARY);
@@ -105,11 +111,16 @@ int main()
             if (debugOrDemoAll) imshow("Low Red Values Mask", greenBlueHueAreas);
             if (debugOrDemoAll) waitKey(0);
 
+            greenBlueHueAreas * (1, 3, 1); //strengthen green channel - helps get complete plate in uneven lighting
+            if (debugOrDemoAll) imshow("Greener", greenBlueHueAreas);
+            if (debugOrDemoAll) waitKey(0);
+
             // at this point, depending on the lighting, we still have a lot of black tray in our image
             // we now use the green channel to reduce the pixels evaluated for feature detection further
             cv::Mat splitGreenMask[3];
             cv::split(greenBlueHueAreas, splitGreenMask);
             cv::Mat noLowGreenValuesMask = splitGreenMask[greenOrAxis];
+            medianBlur(noLowGreenValuesMask, noLowGreenValuesMask, 9);
             normalize(noLowGreenValuesMask, noLowGreenValuesMask, 0, 255, NORM_MINMAX); //improve uneven light conditions - but does introduce some noise, so we only use this for initial detection
             cv::medianBlur(noLowGreenValuesMask, noLowGreenValuesMask, 9);
 
@@ -117,12 +128,14 @@ int main()
             if (debugOrDemoAll) imshow("Green Channel value 50 - 255", noLowGreenValuesMask);
             if (debugOrDemoAll) waitKey(0);
 
-            cv::Mat noLowRedGreen;
-            greenBlueHueAreas.copyTo(noLowRedGreen, noLowGreenValuesMask);
-            normalize(noLowRedGreen, noLowRedGreen, 0, 255, NORM_MINMAX); //improve uneven light conditions
+            if (debugOrDemoAll)
+            {
+                cv::Mat noLowRedGreen;
+                greenBlueHueAreas.copyTo(noLowRedGreen, noLowGreenValuesMask);
 
-            if (debugOrDemoAll) imshow("Presumed Green areas", noLowRedGreen);
-            if (debugOrDemoAll) waitKey(0);
+                imshow("Presumed Green areas", noLowRedGreen);
+                waitKey(0);
+            }
 
             //---------------------------------------------------------
             // The camera angle is not guaranteed to be pralell to the plate, so we want to achieve a better read of the "square" lego plate
@@ -133,6 +146,8 @@ int main()
             // and use the center of said bounding box to find the outer corners of the lego plate
 
             auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, debugOrDemoAll, debugOrDemoAll);
+            if (presumedROI.empty()) continue; 
+
             auto plateRectangle = processor.getPlateRectangle();
             auto plate = plateRectangle.lock();
 
@@ -164,13 +179,20 @@ int main()
                 cv::Mat legoPlate = corrected(*plate);
                 auto thresholdingROI = cv::Rect(plate->tl().x, 0, plate->width, plate->tl().y);
                 cv::Mat exampleBricks = corrected(thresholdingROI);
-                cv::Mat labShades;
-                cv::cvtColor(exampleBricks, labShades, COLOR_BGR2Lab);
+
+                // (Possible) Further work: There could be verification here by detecting cirlces
+                //                          and either counting them or taking the avarage diameter
+                //                          and ensuring the right number of studs are present each row-col
+                //                          It was decided against this as this would introduce 
+                //                          another layer of complexity with no immediate reward.
+                //                          A small skew in the result does not destroy the experience 
+                //                          when translated into the 3D environment, though this would be 
+                //                          a good addition if a more precise translation is wanted
 
                 processor.setImageOfLego(legoPlate);
                 processor.setImageOfBricks(exampleBricks);
 
-                //make plate square now that we have the right area
+                //make plate 'square' now that we have the right area
                 resize(legoPlate, legoPlate, cv::Size(500, 500));
 
                 if (debugOrDemoAll) cv::imshow("Corrected - should be \'straight\' lego plate for better coordinates.", legoPlate);
@@ -179,13 +201,14 @@ int main()
 
                 //get the location of our example bricks for backprojection and template matching
                 auto bricks = processor.findBrickLocations(exampleBricks, debugOrDemoAll);
+                if (bricks.empty()) continue; 
                 std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
                     {
                         return left.tl().x < right.tl().x;
                     });
 
                 int numberOfColours = sizeof(sc_coloursInUse) / sizeof(sc_coloursInUse[0]);
-                if (bricks.size() != numberOfColours)
+                if (bricks.size() != (numberOfColours+1))
                 {
                     ErrorOutput(BrickCVErrors::EXAMPLE_BRICKS_ERROR, "Did not correctly identify", std::to_string(numberOfColours).c_str(), "colours in the exampleBricks image.");
                     continue; //this would scilently break the application, process next image instead
@@ -404,7 +427,6 @@ int main()
                     linePlace++; 
                 }
                 outCSV.close();
-                
                 std::cout << "[INFORMATION] \t \t CSV File contains " << pointCount << " Z coordinates. Should be " << pixelNum << std::endl; 
 
                 //TEST CSV reading
@@ -420,6 +442,8 @@ int main()
             Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "Image pointer could not be converted into a strong reference and had to be skipped");
         }
     } //END main img processing for loop
+
+    std::cout << "PROCESSED IMAGES : " << imagesTried << " with last image name " << fileReader.fileNames[imagesTried-1]; 
 
     //clean up images 
     fileReader.~ImageReader(); 

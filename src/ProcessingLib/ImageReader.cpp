@@ -6,6 +6,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <filesystem>
+#include <iostream>
+
 std::vector<std::weak_ptr<cv::Mat>> ImageProcessing::ImageReader::getImages()
 {
     if (images.empty())
@@ -27,16 +30,15 @@ void ImageProcessing::ImageReader::readImages(const char* imagesPath)
 {
     //get all filenames for a specified pattern 
     cv::String folderpath = imagesPath; 
-    std::vector<cv::String> filepaths; 
-    cv::glob(folderpath, filepaths, false);
+    cv::glob(folderpath, fileNames, false);
 
-    if (filepaths.empty()) //break if we couldn't find images
+    if (fileNames.empty()) //break if we couldn't find images
     {
         Errors::ErrorOutput(Errors::BrickCVErrors::NULL_PTR, "Reading files for filepath \'", imagesPath, "\' was unsuccessful. Please check accuracy of path");
         throw std::exception("No files found for specifiied filepath");
     }
 
-    for (auto file : filepaths)
+    for (auto file : fileNames)
     {
         auto image = cv::imread(file, cv::IMREAD_COLOR); 
         auto pointer = std::make_shared<cv::Mat>(image);
