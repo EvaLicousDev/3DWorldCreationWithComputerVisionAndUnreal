@@ -56,6 +56,7 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     cv::Mat brickAreaCopy; 
     if (showResult) brickArea.copyTo(brickAreaCopy); 
 
+
     cv::Mat brickChannels[3];
     cv::split(brickArea, brickChannels);
     cv::Mat brickMaskReddishColours;
@@ -556,7 +557,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
     {
         Errors::ErrorOutput(Errors::BrickCVErrors::NO_CONTOURS_FOUND, "An image we were trying to process has no contours found.");
         if (showAllRect || showBlackMask) cv::imshow("No contours findable for this", orig); 
-        cv::waitKey; 
+        cv::waitKey(0); 
         return std::vector<cv::Point2f>(); 
     }
 

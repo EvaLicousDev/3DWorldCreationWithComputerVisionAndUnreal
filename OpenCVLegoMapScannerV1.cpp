@@ -32,18 +32,18 @@ int main()
     
     //---------------------------------------------------------
     // Settings
-    bool debugOrDemoAll     = true; 
+    bool debugOrDemoAll     = false; 
     bool resetLog           = true;  // reccomended
     bool createHeightMapPNG = false; // not needed in final product version 1
     bool testCSV            = true;
 
     const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png"; 
 
-    float dynThres_LowerBoundry_LAB      = 0.85; 
-    float dynThresh_UpperBoundry_LAB     = 1.15;
-    float dynThres_LowerBoundry_LCH      = 0.98;
-    float dynThresh_UpperBoundry_LCH     = 1.02;
-    float weightFactor_ChromaChannel_LCH = 0.3; 
+    double dynThres_LowerBoundry_LAB      = 0.85; 
+    double dynThresh_UpperBoundry_LAB     = 1.15;
+    double dynThres_LowerBoundry_LCH      = 0.98;
+    double dynThresh_UpperBoundry_LCH     = 1.02;
+    double weightFactor_ChromaChannel_LCH = 0.3; 
 
     int outRowsCols = 40;
     const char* outputfileName = "heightMapPoints.csv";
@@ -289,7 +289,7 @@ int main()
                     projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
 
                     //In our heightmap we want rivers to be at the deepest point, so we invert the projection and add to the heightmap
-                    if (colourName == BrickColour::DARK_BLUE || colourName == BrickColour::LIGHT_BLUE)
+                    if (colourName == BrickColour::DARK_BLUE)
                     {
                         cv::Mat deepRivers = 255 - resultMap; 
                         processor.addToHeightMap(deepRivers); 
@@ -324,6 +324,78 @@ int main()
                     }
                 }
 
+                debugOrDemoAll = true;
+
+                for (auto [_, imgPtrs] : projections) 
+                {
+                    imgPtrs->reshape(0, legoPlate.rows);
+                    auto img = imgPtrs.get(); 
+                    resize(*img, *img, cv::Size(outRowsCols, outRowsCols)); 
+                }
+
+                //generate output texture
+                auto base = projections.find(WHITE)->second; 
+                cv::Mat outTexture = cv::Mat::zeros(base->rows, base->cols, CV_8UC3);
+                auto pRows = base->rows;
+                auto pCols = base->channels() * base->cols;
+
+                //loop over all pixels in the image and reduce colour value on each cannel
+                for (auto rowIndex = 0; rowIndex < pRows; rowIndex++)
+                {
+                    auto whiteProjectionRow = projections.find(WHITE)->second->ptr<uchar>(rowIndex);
+                    auto purpleProjectionRow = projections.find(PURPLE)->second->ptr<uchar>(rowIndex);
+                    auto dBlueProjectionRow  = projections.find(DARK_BLUE)->second->ptr<uchar>(rowIndex);
+                    auto lBlueProjectionRow  = projections.find(LIGHT_BLUE)->second->ptr<uchar>(rowIndex);
+                    auto brownProjectionRow  = projections.find(BROWN)->second->ptr<uchar>(rowIndex);
+                    auto redProjectionRow    = projections.find(RED)->second->ptr<uchar>(rowIndex);
+                    auto yellowProjectionRow = projections.find(YELLOW)->second->ptr<uchar>(rowIndex);
+                    auto lGreenProjectionRow = projections.find(LIGHT_GREEN)->second->ptr<uchar>(rowIndex);
+
+                    const uchar* pixelArr[8] = { 
+                        whiteProjectionRow
+                        , purpleProjectionRow
+                        , dBlueProjectionRow
+                        , lBlueProjectionRow
+                        , brownProjectionRow
+                        , redProjectionRow
+                        , yellowProjectionRow
+                        , lGreenProjectionRow
+                    };
+
+                    for (auto columnIndex = 0; columnIndex < pCols; columnIndex++)
+                    {
+                        cv::Scalar pixelPredictionColour = BrickCV::getRGBScalar(DARK_GREEN); 
+                        uchar predictionValue = (uchar)200; 
+                        for (int colour = 0; colour < 8; colour++) //using the index to map to sc_coloursInUse
+                        {
+                            auto pixCol = sc_coloursInUse[colour]; 
+                            auto colourRow = (pixelArr)[colour]; 
+                            int pxVal = ((int) (colourRow[columnIndex]));
+                            if ( pxVal >= (int)predictionValue)
+                            {
+                                predictionValue = colourRow[columnIndex]; 
+                                pixelPredictionColour = BrickCV::getRGBScalar(pixCol);
+                            }
+                        }
+
+                        outTexture.at<cv::Vec3b>(rowIndex, columnIndex)[0] = (uchar) pixelPredictionColour[0];
+                        outTexture.at<cv::Vec3b>(rowIndex, columnIndex)[1] = (uchar) pixelPredictionColour[1];
+                        outTexture.at<cv::Vec3b>(rowIndex, columnIndex)[2] = (uchar) pixelPredictionColour[2];
+                    }
+                }
+
+                if (debugOrDemoAll)
+                {
+                    cv::Mat copyTexture; 
+                    outTexture.copyTo(copyTexture);
+                    cv::resize(copyTexture, copyTexture, cv::Size(400,400)); 
+                    cv::imshow("Output texture Prediction", copyTexture);
+                    cv::waitKey(0); 
+                }
+
+                outTexture.convertTo(outTexture, CV_16FC3, 255.0); //Desired file format for heightmaps for UE5 editor landscape system - note that this was used in development but the end product uses a csv file to get the height data and produce a procedural mesh
+                cv::imwrite("C:/Users/evali/Pictures/TexMap.png", outTexture);
+
                 // finish getting heightmap info
                 // we layer over infromation from the colour detection algorithm with some random noise
                 // then we reapeatedly resize and further process the heightmap until an "organic looking" result is achived
@@ -336,7 +408,7 @@ int main()
                 int zoom = dist.rows / 100;
                 cv::Rect distRect(0, 0, zoom, zoom);
                 cv::Mat noiseZoom = dist(distRect);
-                resize(noiseZoom, noiseZoom, cv::Size(heightMap->cols, heightMap->rows));
+                cv::resize(noiseZoom, noiseZoom, cv::Size(heightMap->cols, heightMap->rows));
                 auto slope = cv::Rect(0, 0, noiseZoom.cols, noiseZoom.rows);
                 cv::rectangle(noiseZoom, slope, cv::Scalar(50), 200);
                 cv::rectangle(noiseZoom, slope, cv::Scalar(0), 100);
@@ -359,12 +431,12 @@ int main()
                 cv::resize(out, out, cv::Size(100,100));
 
                 cv::GaussianBlur(out, out, cv::Size(15, 15), 50, 50);
-                resize(out, out, cv::Size(heightMap->cols, heightMap->rows));
+                cv::resize(out, out, cv::Size(heightMap->cols, heightMap->rows));
                 cv::normalize(out, out, 0, 255, NORM_MINMAX);
                 cv::medianBlur(out,out,3); 
 
                 //debugOrDemoAll = true; 
-                if (debugOrDemoAll) resize(out, out, cv::Size(500,500));
+                if (debugOrDemoAll) cv::resize(out, out, cv::Size(500,500));
                 if (debugOrDemoAll) cv::imshow("HeightMap", out);
                 if (debugOrDemoAll) cv::waitKey(0);
 
@@ -375,7 +447,7 @@ int main()
                 // coordinates of the landscape
                 int pixelNum = outRowsCols * outRowsCols; 
 
-                resize(out, out, cv::Size(outRowsCols,outRowsCols));
+                cv::resize(out, out, cv::Size(outRowsCols,outRowsCols));
                 out.convertTo(out, CV_8UC1); //convert back to values between 0 - 255 stored as Uchars
 
                 out.reshape(0, outRowsCols); //sanity check - ensure image not continuous
@@ -385,7 +457,6 @@ int main()
                 auto rows = out.rows;
                 auto cols = out.cols;
 
-                // generating vertex data - getting the value of the pixel for z at position xy
                 if (out.channels() == 1)
                 {
                     std::cout << "[Information] \t \t About to prepare point data. This will take a while..." << std::endl;
@@ -394,7 +465,6 @@ int main()
                         uchar* rowPtr = out.ptr<uchar>(row);
                         for (int16_t col = 0; col < cols; col++)
                         {
-                            //vertex data
                             auto zVal = rowPtr[col];
                             auto& pointVal = pointData[vectorIndex];
                             uint8_t pixelValContainingZ = static_cast<uint8_t>(zVal);
@@ -434,7 +504,7 @@ int main()
                 {
                     legoCVTests::CVAppOutputTester::testCSVOutput(outputfileName);
                 }
-
+                break; 
             }
         } 
         else
