@@ -26,6 +26,8 @@ namespace ImageProcessing
 
         std::vector<std::weak_ptr<cv::Mat>> getImages(); 
         void readImages(const char* imagePath); 
+        std::vector<std::string> fileNames{};
+
     private:
         std::vector<std::shared_ptr<cv::Mat>> images{}; 
     };

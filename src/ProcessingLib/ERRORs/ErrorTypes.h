@@ -21,7 +21,9 @@ namespace Errors
         IMAGE_NOT_3_CHANNEL = 13,
         IMAGE_WASNT_READ_RIGHT = 14,
         EXAMPLE_BRICKS_ERROR = 15,
-        PARSING_POINT_DATA = 16
+        PARSING_POINT_DATA = 16,
+        PI_SHARED_DRIVE_MISSING = 17,
+        NO_CONTOURS_FOUND = 18
     };
 
     static const constexpr char* getErrorMessage(const BrickCVErrors& error)
@@ -85,6 +87,12 @@ namespace Errors
             break;
         case PARSING_POINT_DATA:
             return "[WARNING] \t [Expensive operation parsing .xyz file] \n";
+            break;
+        case PI_SHARED_DRIVE_MISSING:
+            return "[CRITICAL ERROR] \t [Image Source directory not locatable] Check the connection to the Raspberry Pi 5 Camera system. \n";
+            break;
+        case NO_CONTOURS_FOUND:
+            return "[IMPORTANT ERROR] \t [Image Source directory not locatable] Check the connection to the Raspberry Pi 5 Camera system. \n";
             break;
         default:
             return "------------------------------------------------------------------- \n [UNKNOWN ERROR] \n \t \t I can't belive this. It done goofed!! How could this happen?? \n \t \t The anguish! \n \t \t Anyway, something went really wrong if you see this. Better check what happened... \n ------------------------------------------------------------------- \n";

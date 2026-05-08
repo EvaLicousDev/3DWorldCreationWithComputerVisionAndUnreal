@@ -10,11 +10,12 @@ endif()
 
 project (OpenCVLegoMapScannerV1)
 set( CMAKE_CXX_STANDARD 20 )
-add_definitions(-DIMAGE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ImageFolder") #this is where the app will take the images it's processing from 
+add_definitions(-DIMAGE_DIR="${IMAGE_DRIVE}") #this is where the app will take the images it's processing from 
 
 #computer vision library
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_DIR})
+include_directories(${PYTHON_H_INCLUDE})
 
 # Add source to this project's executable and additional files
 # Include all 
