@@ -15,7 +15,7 @@ add_library(
 	Histogram/ColourHistogram.h
 	Histogram/ColourHistogram.cpp
 	Histogram/HistorgramGraphCreator.h
-  "ERRORs/ErrorOutput.h" "BrickColourClassifier.h" "CustomHDRProcessing/HDRImageArrayMerger.h" "CustomHDRProcessing/HDRImageArrayMerger.cpp" "ColourDetector.h" "ColourDetector.cpp" "PredefinedColours.h" "SVMclassifier/SVMClassifier.h" "SVMclassifier/TrainingInstanceDataStructs.h" "BrickCVEnums/FeatureEnum.h" "ImageReader.h" "ImageReader.cpp" "Tests/CVAppOutputTester.h")
+    "ERRORs/ErrorOutput.h" "BrickColourClassifier.h" "ColourDetector.h" "ColourDetector.cpp" "PredefinedColours.h" "SVMclassifier/SVMClassifier.h" "SVMclassifier/TrainingInstanceDataStructs.h" "BrickCVEnums/FeatureEnum.h" "ImageReader.h" "ImageReader.cpp" "Tests/CVAppOutputTester.h")
 
 include_directories(${OpenCV_DIR})
 target_link_libraries(ProcessingLib ${OpenCV_LIBS})

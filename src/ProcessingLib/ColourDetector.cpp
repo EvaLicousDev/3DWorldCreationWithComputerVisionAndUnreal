@@ -231,6 +231,7 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRangeIndividual
     {
         ErrorOutput(Errors::BrickCVErrors::COLOUR_SPACE_MISMATCH, "This function - findPixelsWithColourInRangeIndividualChannels() - expects LAB, LUV or LCHuv");
     }
+    return cv::Mat(); 
 }
 
 cv::Mat AbsColourDistance::ColourDetector::getLCHuvCHROMAMat(const cv::Mat& labAChannel, const cv::Mat& labBChannel, const ChannelType channelType)
