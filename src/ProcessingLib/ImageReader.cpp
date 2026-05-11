@@ -60,7 +60,8 @@ void ImageProcessing::ImageReader::readImages(const char* imagesPath)
 
         if (timePassed.count() > 500)
         {
-            std::cout << "[IMPORTANT INFORMATION] \t 5 minutes have passed and the images have not been found at the specified location. \t \t \t \t \t The application will now be terminated." << std::endl; 
+            std::cout << "[IMPORTANT INFORMATION] \t 5 minutes have passed and the images have not been found at the specified location. \n \t \t \t \t \t The application will now be terminated..." << std::endl; 
+            throw std::exception("Network drive could not be contacted");
             return;
         }
     }
