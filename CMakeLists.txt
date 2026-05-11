@@ -15,7 +15,6 @@ add_definitions(-DIMAGE_DIR="${IMAGE_DRIVE}") #this is where the app will take t
 #computer vision library
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_DIR})
-include_directories(${PYTHON_H_INCLUDE})
 
 # Add source to this project's executable and additional files
 # Include all 

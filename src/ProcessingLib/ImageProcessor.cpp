@@ -1,6 +1,10 @@
 #include "ImageProcessor.h"
 #include "ImageProcessor.h"
 #include "ImageProcessor.h"
+#include "ImageProcessor.h"
+#include "ImageProcessor.h"
+#include "ImageProcessor.h"
+#include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
 #include "ERRORs/ErrorOutput.h"
 #include "Histogram/ColourHistogram.h"
@@ -18,6 +22,147 @@
 void ImageProcessing::ImageProcessor::setWhiteBrick(cv::Mat& image)
 {
     whiteBrick = std::make_shared<cv::Mat>(image);
+}
+
+cv::Mat ImageProcessing::ImageProcessor::createRetinex(const cv::Mat& input, bool showResult)
+{
+    //based on openCV documentation : https://opencv.org/shadow-correction-using-opencv/
+    cv::Mat shadowyInput;
+    input.copyTo(shadowyInput);
+    cv::cvtColor(shadowyInput, shadowyInput, cv::COLOR_BGR2Lab);
+    shadowyInput.convertTo(shadowyInput, CV_32FC3); 
+
+    cv::Mat labChannels[3]; 
+    cv::split(shadowyInput, labChannels); 
+
+    int scales[3] = {31, 101, 301};
+    cv::Mat retinex = cv::Mat::zeros(input.rows, input.cols, CV_32FC1); 
+
+    cv::Mat blurred; 
+    for (auto scale : scales)
+    {
+        cv::GaussianBlur(labChannels[0], blurred, cv::Size(scale, scale), 0);
+        cv::Mat logLuminanceP1 = labChannels[0] + 1; //avoid log(0)
+        cv::Mat logblurredP1 = blurred + 1; 
+        cv::log(logLuminanceP1, logLuminanceP1); 
+        cv::log(logblurredP1, logblurredP1); 
+        retinex += (logLuminanceP1 - logblurredP1); 
+    }
+
+    retinex /= 3; // size of scales array
+
+    if (showResult) cv::imshow("Retinex L channel", retinex);
+    if (showResult) cv::waitKey(0);
+
+    return retinex; 
+}
+
+cv::Mat ImageProcessing::ImageProcessor::adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity /* = 1.0 */, int maskBlurr /* = 21 */, bool showResult)
+{
+    // based on openCV documentation : https://opencv.org/shadow-correction-using-opencv/
+    // combine the L channel in LAB with the Saturation in HSV to avoid creating new heus through skew 
+    cv::Mat shadowyInput;
+    cv::Mat shadowyHSV; 
+    input.copyTo(shadowyInput);
+    input.copyTo(shadowyHSV);
+    cv::cvtColor(shadowyInput, shadowyInput, cv::COLOR_BGR2Lab);
+    cv::cvtColor(shadowyHSV, shadowyHSV, cv::COLOR_BGR2HSV);
+    shadowyInput.convertTo(shadowyInput, CV_32FC3);
+    shadowyHSV.convertTo(shadowyHSV, CV_32FC3);
+
+    cv::Mat lab[3];
+    cv::Mat hsv[3];
+    cv::split(shadowyInput, lab);
+    cv::split(shadowyHSV, hsv);
+
+    cv::Mat mask = cv::Mat::zeros(shadowyInput.rows, shadowyInput.cols, CV_32FC1);
+    mask += (((lab[0] < 0.5) * sensitivity) & (hsv[1] < 0.5));
+
+    if (showResult) cv::imshow("Adaptive shadow mask using LAB and HSV", mask);
+    if (showResult) cv::waitKey(0);
+
+    return mask; 
+}
+
+cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv::Mat& retinex, double strength, cv::Mat mask, int maskBlurr, bool showResult)
+{
+    if (mask.empty())
+    {
+        Errors::ErrorOutput(Errors::NULL_PTR, "Shadow mask is empty. Was the function called too early?");
+        return cv::Mat();
+    }
+
+    // based on openCV documentation : https://opencv.org/shadow-correction-using-opencv/
+    cv::Mat shadowyInput;
+    input.copyTo(shadowyInput);
+    cv::cvtColor(shadowyInput, shadowyInput, cv::COLOR_BGR2Lab);
+    shadowyInput.convertTo(shadowyInput, CV_32FC3);
+
+    cv::Mat labChannels[3];
+    cv::split(shadowyInput, labChannels);
+
+    auto elipsicalKernal = cv::getStructuringElement(cv::MorphShapes::MORPH_ELLIPSE, cv::Size(7,7)); 
+    cv::Mat shadowMask; 
+    cv::Mat shadowMask2; 
+    cv::morphologyEx(mask, shadowMask, cv::MorphTypes::MORPH_CLOSE, elipsicalKernal); //close gaps
+    cv::dilate(shadowMask, shadowMask2, elipsicalKernal, cv::Point(-1,-1), 1); 
+
+    cv::medianBlur(shadowMask2, shadowMask2, 5);
+    cv::pow(shadowMask2, 1.5 ,shadowMask2);
+
+    if (showResult) cv::imshow("Shadow mask 2", shadowMask2);
+    if (showResult) cv::waitKey(0);
+
+    auto inverse = 1 - retinex; 
+    if (showResult) cv::imshow("inverted retinex", inverse);
+    if (showResult) cv::waitKey(0);
+
+    cv::Mat Lchan = labChannels[0] + inverse;
+
+    if (showResult) cv::imshow("L channel adjusted", Lchan);
+    if (showResult) cv::waitKey(0);
+
+    cv::Mat image[3] = {Lchan, labChannels[1], labChannels[2] };
+    cv::Mat result; 
+    cv::merge(image, 3, result);
+
+    result.convertTo(result, CV_8UC3);
+    cv::cvtColor(result, input, cv::COLOR_Lab2BGR);
+    cv::cvtColor(result, result, cv::COLOR_Lab2BGR);
+
+    if (showResult) cv::imshow("Evened out Luminance", result);
+    if (showResult) cv::waitKey(0);
+
+    shadowMask2.convertTo(shadowMask2, CV_8UC3);
+    cv::resize(shadowMask2, shadowMask2, cv::Size(result.cols, result.rows));
+    cv::Mat bgrShadows;
+    result.copyTo(bgrShadows, shadowMask2);
+
+    if (showResult) cv::imshow("BGR shadows", bgrShadows);
+    if (showResult) cv::waitKey(0);
+
+    cv::Mat hsvShadows;
+    cv::cvtColor(bgrShadows, hsvShadows, cv::COLOR_BGR2HSV);
+    cv::Mat hsv[3]; 
+    cv::split(hsvShadows, hsv); 
+
+    hsv[1] += cv::saturate_cast<uchar>(20); 
+    hsv[2] += cv::saturate_cast<uchar>(20);
+
+    cv::Mat intense; 
+    cv::merge(hsv, 3, intense); 
+    cv::cvtColor(intense, intense, cv::COLOR_HSV2BGR);
+    intense.copyTo(bgrShadows, shadowMask2);
+
+    result += bgrShadows; 
+
+    if (showResult) cv::imshow("BGR shadows 2", intense);
+    if (showResult) cv::waitKey(0);
+
+    if (showResult) cv::imshow("Removed shadows fin", result);
+    if (showResult) cv::waitKey(0);
+
+    return result; 
 }
 
 void ImageProcessing::ImageProcessor::addToHeightMap(const cv::Mat& info)
@@ -55,7 +200,6 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
     auto demo = showResult; 
     cv::Mat brickAreaCopy; 
     if (showResult) brickArea.copyTo(brickAreaCopy); 
-
 
     cv::Mat brickChannels[3];
     cv::split(brickArea, brickChannels);
@@ -115,7 +259,7 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
                     bool isInBricks = false;
                     for (auto brickRectangle : bricks)
                     {
-                        // We check if the rectangles overlap 
+                        // Check if this rectangle overlaps with any of our previously selected areas
                         // for synatx explanation refer to https://putuyuwono.wordpress.com/2015/06/26/intersection-and-union-two-rectangles-opencv/
                         isInBricks = (smallerRect & brickRectangle).area() > 0;
                         if (isInBricks) dontPlace = true;
@@ -391,7 +535,6 @@ cv::Rect ImageProcessing::ImageProcessor::findLargestVoliumChild(std::vector<cv:
                 cv::rectangle(roi, drawRect, cv::Scalar(0, 255, 0));
             }
 
-            //TO DO: CHANGE LOGIC 
             cv::Rect square = findSquareIsh(contours[childIDx]);
             if (square.width*square.height > maxVol) 
             {
@@ -642,6 +785,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
         if (!foundTopRight) orderdPoints[1] = findTR(contours, centerOfLargest);
         if (!foundBotRight) orderdPoints[2] = findBR(contours, centerOfLargest);
         if (!foundBotLeft)  orderdPoints[3] = findBL(contours, centerOfLargest);
+
         largestCorners.clear();
         largestCorners.emplace_back(orderdPoints[0]);
         largestCorners.emplace_back(orderdPoints[1]);
@@ -758,7 +902,7 @@ cv::Point2f ImageProcessing::ImageProcessor::findBR(std::vector<std::vector<cv::
         for (auto point : cont)
         {
             int tollerance = 5;
-            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
+            bool isInLargestRect = (point.x > (m_biggestRect->tl().x - tollerance) && point.x <= (m_biggestRect->br().x + tollerance)) && (point.y > (m_biggestRect->tl().y - tollerance) && point.y < (m_biggestRect->br().y + tollerance));
             if (isInLargestRect && point.x > middle.x && point.y > middle.y)
             {
                 double pointDistanceSquared = ((point.x - middle.x) ^ 2) + ((point.y - middle.y) ^ 2);

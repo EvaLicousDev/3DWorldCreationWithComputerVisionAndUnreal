@@ -89,6 +89,10 @@ namespace ImageProcessing
         cv::Point2f findBL(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
         cv::Point2f findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
 
+        cv::Mat createRetinex(const cv::Mat& input, bool showResult = false);
+        cv::Mat adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity = 1.0, int maskBlurr = 21, bool showResult = false);
+        cv::Mat removeShadows(const cv::Mat& input, cv::Mat& retinex, double strength = 0.9, cv::Mat mask = cv::Mat(), int maskBlurr = 31, bool showResult = false);
+
         // DEPRECATED
         cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);
         cv::Rect findRectWithLongestSide(const std::vector<std::vector<cv::Point>>& contours, cv::Rect& topleftGreenCorner);
