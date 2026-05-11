@@ -45,11 +45,6 @@ namespace ImageProcessing
          *
          * Goal:
          * Find the locations of different colour lego pieces in the image.
-         *
-         * Theory:
-         * The RGB space provides 256 x 256 x 256 colours over three channels (approximately 16 mil).
-         * Therefor we want to reduce the number of colours processed down to the minimum needed. 
-         * Additionally using device independent colour spaces and colour spaces that match shades to unique value helps make detection more reliable.
          * 
          * Colour spaces used to identify bricks are primarely LAB and LCH. Please also view BrickCVEnums/BrickColourEnum.h for more comments.
          * LAB was chosen due to the initial literature review and testing & LCH was added to improve detection further
@@ -90,8 +85,8 @@ namespace ImageProcessing
         cv::Point2f findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle);
 
         cv::Mat createRetinex(const cv::Mat& input, bool showResult = false);
-        cv::Mat adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity = 1.0, int maskBlurr = 21, bool showResult = false);
-        cv::Mat removeShadows(const cv::Mat& input, cv::Mat& retinex, double strength = 0.9, cv::Mat mask = cv::Mat(), int maskBlurr = 31, bool showResult = false);
+        cv::Mat adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity = 1.0, bool showResult = false);
+        cv::Mat removeShadows(const cv::Mat& input, cv::Mat& retinex, cv::Mat mask = cv::Mat(), bool showResult = false);
 
         // DEPRECATED
         cv::Rect findLargestVoliumSquareContour(std::vector<std::vector<cv::Point>>& boxes);

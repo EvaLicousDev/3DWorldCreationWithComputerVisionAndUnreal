@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <opencv2/core.hpp>
+#include <chrono>
 
 using namespace Errors; 
 namespace ImageProcessing
@@ -18,7 +19,7 @@ namespace ImageProcessing
         ImageReader() = default;
         ~ImageReader() 
         {
-           for (auto imagPtr : images)
+           for (auto imagPtr : m_images)
            {
                imagPtr.reset(); 
            }
@@ -26,9 +27,9 @@ namespace ImageProcessing
 
         std::vector<std::weak_ptr<cv::Mat>> getImages(); 
         void readImages(const char* imagePath); 
-        std::vector<std::string> fileNames{};
+        std::vector<std::string> m_fileNames{};
 
     private:
-        std::vector<std::shared_ptr<cv::Mat>> images{}; 
+        std::vector<std::shared_ptr<cv::Mat>> m_images{}; 
     };
 }

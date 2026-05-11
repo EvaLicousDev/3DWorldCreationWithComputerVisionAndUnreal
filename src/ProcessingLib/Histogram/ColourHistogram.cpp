@@ -6,7 +6,6 @@
 #include "../BrickCVEnums/ChannelType.h"
 #include "../ERRORs/ErrorOutput.h"
 
-//CONSTRUCTOR
 Histogram::ColourHistogram::ColourHistogram(BrickCV::BrickColour brickColour, BrickCV::ChannelType channel, cv::Mat& channelMat)
 {
     this->channel     = channel;

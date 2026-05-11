@@ -57,7 +57,7 @@ cv::Mat ImageProcessing::ImageProcessor::createRetinex(const cv::Mat& input, boo
     return retinex; 
 }
 
-cv::Mat ImageProcessing::ImageProcessor::adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity /* = 1.0 */, int maskBlurr /* = 21 */, bool showResult)
+cv::Mat ImageProcessing::ImageProcessor::adaptiveShadowRemovalMask(const cv::Mat& input, const cv::Mat& retinex, double sensitivity /* = 1.0 */, bool showResult)
 {
     // based on openCV documentation : https://opencv.org/shadow-correction-using-opencv/
     // combine the L channel in LAB with the Saturation in HSV to avoid creating new heus through skew 
@@ -84,7 +84,8 @@ cv::Mat ImageProcessing::ImageProcessor::adaptiveShadowRemovalMask(const cv::Mat
     return mask; 
 }
 
-cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv::Mat& retinex, double strength, cv::Mat mask, int maskBlurr, bool showResult)
+// custom function to replace the shadowy areas with pixels boosted in saturation and value. Also permanently applies the luminance transformation to the input image
+cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv::Mat& retinex, cv::Mat mask, bool showResult)
 {
     if (mask.empty())
     {
@@ -110,13 +111,10 @@ cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv:
     cv::medianBlur(shadowMask2, shadowMask2, 5);
     cv::pow(shadowMask2, 1.5 ,shadowMask2);
 
-    if (showResult) cv::imshow("Shadow mask 2", shadowMask2);
+    if (showResult) cv::imshow("Shadow mask", shadowMask2);
     if (showResult) cv::waitKey(0);
 
     auto inverse = 1 - retinex; 
-    if (showResult) cv::imshow("inverted retinex", inverse);
-    if (showResult) cv::waitKey(0);
-
     cv::Mat Lchan = labChannels[0] + inverse;
 
     if (showResult) cv::imshow("L channel adjusted", Lchan);
@@ -130,7 +128,7 @@ cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv:
     cv::cvtColor(result, input, cv::COLOR_Lab2BGR);
     cv::cvtColor(result, result, cv::COLOR_Lab2BGR);
 
-    if (showResult) cv::imshow("Evened out Luminance", result);
+    if (showResult) cv::imshow("Evened out Luminance - result written to input image", result);
     if (showResult) cv::waitKey(0);
 
     shadowMask2.convertTo(shadowMask2, CV_8UC3);
@@ -146,6 +144,7 @@ cv::Mat ImageProcessing::ImageProcessor::removeShadows(const cv::Mat& input, cv:
     cv::Mat hsv[3]; 
     cv::split(hsvShadows, hsv); 
 
+    //bump hue and saturation channels
     hsv[1] += cv::saturate_cast<uchar>(20); 
     hsv[2] += cv::saturate_cast<uchar>(20);
 
@@ -214,6 +213,11 @@ std::vector<cv::Rect> ImageProcessing::ImageProcessor::findBrickLocations(cv::Ma
 
     cv::medianBlur(brickMaskReddishColours, brickMaskReddishColours, 5); 
     cv::medianBlur(brickMaskBluishColours, brickMaskBluishColours, 5);
+
+    auto elipsicalKernal = cv::getStructuringElement(cv::MorphShapes::MORPH_ELLIPSE, cv::Size(7, 7));
+    cv::morphologyEx(brickMaskReddishColours, brickMaskReddishColours, cv::MorphTypes::MORPH_CLOSE, elipsicalKernal); //close gaps
+    cv::morphologyEx(brickMaskBluishColours, brickMaskBluishColours, cv::MorphTypes::MORPH_CLOSE, elipsicalKernal); //close gaps
+
     if (demo) cv::imshow("Brick mask Reds", brickMaskReddishColours);
     if (demo) cv::imshow("Brick mask Blues", brickMaskBluishColours);
     if (demo) cv::waitKey(0);
@@ -383,7 +387,7 @@ cv::Rect ImageProcessing::ImageProcessor::findSquareIsh(const std::vector<cv::Po
 }
 
 
-
+// This relies haevily on how cv::MSER::create is set up vs how the light conditions are, which is why it was phased out
 cv::Mat ImageProcessing::ImageProcessor::getMSERMask(cv::Mat unblurredImage, bool showAreas /* = false */)
 {
     cv::Mat mserMask; 
@@ -599,14 +603,13 @@ cv::Rect ImageProcessing::ImageProcessor::findChildCorners(int largestVoliumInde
     return outRect;
 }
 
+// DEPRECATED: was written for locating white bricks and using that information. No longer part of the core logic
 void ImageProcessing::ImageProcessor::setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult)
 {
     auto outRect = cv::Rect(0, 0, 0, 0);
 
     for (int parentIdx(0); parentIdx >= 0; parentIdx = hierarchy[parentIdx][NEXT_SIBLING])
     {
-        //CV_Assert(hierarchy[parentIdx][PARENT_CONTOUR] == -1, "Must be top level hirarchy element");
-
         //Not interrested in contours with no children - we want to find the black tray which would have children based previous thresholding
         if (hierarchy[parentIdx][CHILD_CONTOUR] == -1) {
             if (showResult)
@@ -729,57 +732,6 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
         bool foundBotLeft = false;
         bool foundTopRight = false;
         bool foundBotRight = false;
-
-        /*
-        int tollerance = 5; 
-        //find top left 
-        for (auto point : largestCorners)
-        {
-            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect && point.x < centerOfLargest.x && point.y < centerOfLargest.y)
-            {
-                orderdPoints[0] = cv::Point2f(point);
-                foundTopLeft = true;
-                break;
-            }
-        }
-
-        //find top right 
-        for (auto point : largestCorners)
-        {
-            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect && point.x > centerOfLargest.x && point.y < centerOfLargest.y)
-            {
-                orderdPoints[1] = cv::Point2f(point);
-                foundTopRight = true;
-                break;
-            }
-        }
-
-        //find bottom right 
-        for (auto point : largestCorners)
-        {
-            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect && point.x > centerOfLargest.x && point.y > centerOfLargest.y)
-            {
-                orderdPoints[2] = cv::Point2f(point);
-                foundBotRight = true;
-                break;
-            }
-        }
-
-        //find bottom left
-        for (auto point : largestCorners)
-        {
-            bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect && point.x < centerOfLargest.x && point.y > centerOfLargest.y)
-            {
-                orderdPoints[3] = cv::Point2f(point);
-                foundBotLeft = true;
-                break;
-            }
-        }
-        */
 
         // if we have less than 4 points we need to find the missing points
         // once all are found we emplace them according to the order we require for the warp matrix 
@@ -960,9 +912,6 @@ cv::Rect ImageProcessing::ImageProcessor::getPlateWithGreenChannel(cv::Mat unpro
         imshow("[Initial detection failed, so fallback triggered] Fallback Output", unprocessedROI);
         cv::waitKey(0);
     }
-
-    //TO DO: Either try another fallback or demand a better image if this fails
-
     return largest; 
 }
 

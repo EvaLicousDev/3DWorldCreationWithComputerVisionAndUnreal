@@ -19,12 +19,12 @@ using namespace ImageProcessing;
 
 // Image directory defined in CMake Lists file
 static const std::string sc_imageFilesPattern = string("Y:/LegoImages") + "/*.jpg";
-static const std::string sc_testImages        = string("C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder/HDR_MAP4") + "*.jpg";
+static const std::string sc_testImages        = string("C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder/HDR_MAP") + "*.jpg";
 
 
 // IMPORTANT INFORMATION:
 // This code works on the predefined range of colours in BrickCVEnum/BrickColourEnum -> sc_coloursInUse
-// That line needs to match the physical plate above the map area with the example colours from left to right
+// That line needs to match the physical plate above the map area with the example colours from left to right, starting with white and ending with white
 int main()
 {
     std::cout << "--------------------------------------------------------------------------------------" << std::endl;
@@ -33,14 +33,14 @@ int main()
     
     //---------------------------------------------------------
     // Settings
-    bool debugOrDemoAll     = true; 
+    bool debugOrDemoAll     = false; 
     bool resetLog           = true;  // reccomended
     bool createHeightMapPNG = false; // not needed in final product version 1
-    bool testCSV            = true;
-    bool useTestImages      = true; 
+    bool testCSV            = false;
+    bool useTestImages      = false; 
 
     const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png";
-    const char* textureOutputPath = "C:/Users/evali/Pictures/TexMap.png";
+    const char* textureOutputPath   = "C:/Users/evali/Pictures/TexMap.png";
 
     double dynThres_LowerBoundry_LAB      = 0.85; 
     double dynThresh_UpperBoundry_LAB     = 1.15;
@@ -65,13 +65,14 @@ int main()
     //Load image files
     ImageReader fileReader{};
     auto files = useTestImages ? sc_testImages : sc_imageFilesPattern; 
-    fileReader.readImages(files.c_str());
+    std::cout << "Trying to find image files at " << files << std::endl; 
+    fileReader.readImages(files.c_str()); //tries finding files for 5 minutes at specified location
     auto images = fileReader.getImages(); 
 
     //---------------------------------------------------------
     //Begin main processing loop - try and process an image and go to the next one if that fails
 
-    bool success = false; 
+    bool success    = false; 
     int imagesTried = 0; 
     for(auto imagePtr : images)
     {
@@ -92,12 +93,14 @@ int main()
             if (debugOrDemoAll) cv::imshow("currently processing this image", imageToProc);
             if (debugOrDemoAll) cv::waitKey(0);
 
-            auto retinex = processor.createRetinex(imageToProc, debugOrDemoAll);
-            auto mask = processor.adaptiveShadowRemovalMask(imageToProc, retinex, 1, 21, debugOrDemoAll); 
-            auto corrected = processor.removeShadows(imageToProc, retinex, 0.9, mask, 31, debugOrDemoAll);
+            //even out luminance channel and create second image where hue & saturation are increased 
+            auto retinex   = processor.createRetinex(imageToProc, debugOrDemoAll);
+            auto mask      = processor.adaptiveShadowRemovalMask(imageToProc, retinex, 1, debugOrDemoAll); 
+            auto corrected = processor.removeShadows(imageToProc, retinex, mask, debugOrDemoAll);
 
             cv::Mat imagesToProcess[2] = {imageToProc, corrected}; 
 
+            // MAIN BODY
             for (auto imageToProcess : imagesToProcess) 
             {
                 //---------------------------------------------------------
@@ -185,8 +188,8 @@ int main()
 
                     // Create two images for further processing
                     // 1 for the lego plate, 1 for the row above the plate  
-                    cv::Mat legoPlate = corrected(*plate);
-                    auto thresholdingROI = cv::Rect(plate->tl().x, 0, plate->width, plate->tl().y);
+                    cv::Mat legoPlate     = corrected(*plate);
+                    auto thresholdingROI  = cv::Rect(plate->tl().x, 0, plate->width, plate->tl().y);
                     cv::Mat exampleBricks = corrected(thresholdingROI);
 
                     // (Possible) Further work: There could be verification here by detecting cirlces
@@ -219,7 +222,7 @@ int main()
                     auto bricks = processor.findBrickLocations(exampleBricks, debugOrDemoAll);
                     if (bricks.empty()) continue;
 
-                    debugOrDemoAll = true;
+                    //debugOrDemoAll = true;
                     std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
                         {
                             return left.tl().x < right.tl().x;
@@ -246,6 +249,11 @@ int main()
                     {
                         auto expectedColour = sc_coloursInUse[index];
                         cv::Mat brickMat = exampleBricks(brick);
+                        if (brickMat.empty() || brickMat.rows == 0 || brickMat.cols == 0)
+                        {
+                            Errors::ErrorOutput(Errors::NULL_PTR, "Image created from sample rectangle for sample bricks is empty or has dim * 0");
+                            continue; 
+                        }
                         auto colourByDistance = detector.getBrickApproximation(brickMat);
 
                         if (expectedColour != colourByDistance)
@@ -305,7 +313,7 @@ int main()
                         cv::resize(resultMap, resultMap, cv::Size(legoPlate.cols, legoPlate.rows));
                         cv::resize(projectRange, projectRange, cv::Size(legoPlate.cols, legoPlate.rows));
 
-                        // The accuracy of the detection of Brown & white rely heavily on the (otherwise) unprocessed channel in LCH
+                        // The accuracy of the detection of brown & white rely heavily on the (otherwise) unprocessed channel in LCH
                         // so we limit the processing of that channel for efficency reasons 
                         if (colourName != BrickColour::WHITE && colourName != BrickColour::BROWN) cv::add(resultMap, chromaHue, resultMap);
                         cv::add(resultMap, projectRange, resultMap);
@@ -348,8 +356,10 @@ int main()
                         }
                     }
 
-                    debugOrDemoAll = true;
+                    // debugOrDemoAll = true;
 
+                    //------------------------------------------------------------------------
+                    //generate output texture for biome mapping
                     for (auto [_, imgPtrs] : projections)
                     {
                         imgPtrs->reshape(0, legoPlate.rows);
@@ -357,12 +367,13 @@ int main()
                         resize(*img, *img, cv::Size(outRowsCols, outRowsCols));
                     }
 
-                    //generate output texture for biome mapping
                     auto base = projections.find(WHITE)->second;
                     cv::Mat outTexture = cv::Mat::zeros(base->rows, base->cols, CV_8UC3);
                     auto pRows = base->rows;
                     auto pCols = base->channels() * base->cols;
 
+                    // TO DO: tidy up into seperate function
+                    // TO DO: logging for projectioins.find(COLOR) - This breaks the application if second can't get accessed
                     // compare the result of out colour prediction heatmaps, and write the "most likely" value to the pixel 
                     for (auto rowIndex = 0; rowIndex < pRows; rowIndex++)
                     {
@@ -420,6 +431,7 @@ int main()
                     outTexture.convertTo(outTexture, CV_16FC3, 255.0); //Desired file format for heightmaps for UE5 editor landscape system - note that this was used in development but the end product uses a csv file to get the height data and produce a procedural mesh
                     cv::imwrite(textureOutputPath, outTexture);
 
+                    //-------------------------------------------------------------------
                     // finish getting heightmap info
                     // we layer over infromation from the colour detection algorithm with some random noise
                     // then we reapeatedly resize and further process the heightmap until an "organic looking" result is achived
@@ -529,8 +541,10 @@ int main()
                     {
                         legoCVTests::CVAppOutputTester::testCSVOutput(outputfileName);
                     }
+                    success = true; 
                     break;
                 }
+                if (success) break;
             }
         } 
         else
@@ -539,7 +553,7 @@ int main()
         }
     } //END main img processing for loop
 
-    std::cout << "PROCESSED IMAGES : " << imagesTried << " with last image name " << fileReader.fileNames[imagesTried-1]; 
+    std::cout << "PROCESSED IMAGES : " << imagesTried << " with last image name " << fileReader.m_fileNames[imagesTried-1] << std::endl; 
 
     //clean up images 
     fileReader.~ImageReader(); 
