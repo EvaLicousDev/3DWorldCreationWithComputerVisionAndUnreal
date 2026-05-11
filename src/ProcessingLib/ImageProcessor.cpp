@@ -730,6 +730,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
         bool foundTopRight = false;
         bool foundBotRight = false;
 
+        /*
         int tollerance = 5; 
         //find top left 
         for (auto point : largestCorners)
@@ -778,6 +779,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
                 break;
             }
         }
+        */
 
         // if we have less than 4 points we need to find the missing points
         // once all are found we emplace them according to the order we require for the warp matrix 
@@ -801,6 +803,7 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
                 cv::circle(orig, point, 5, CV_RGB(255, 200 - colour, colour), cv::FILLED);
                 colour += 45;
             }
+            //cv::rectangle(orig, *m_biggestRect.get(), CV_RGB(255, 0, 0), 3);
             cv::imshow("Points detected", orig);
             cv::waitKey(0);
         }
@@ -853,7 +856,7 @@ cv::Point2f ImageProcessing::ImageProcessor::findTR(std::vector<std::vector<cv::
         {
             int tollerance = 5;
             bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect = point.x > middle.x && point.y < middle.y)
+            if (isInLargestRect && point.x > middle.x && point.y < middle.y)
             {
                 double pointDistanceSquared = ((point.x-middle.x) ^ 2) + ((middle.y - point.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
@@ -878,7 +881,7 @@ cv::Point2f ImageProcessing::ImageProcessor::findBL(std::vector<std::vector<cv::
         {
             int tollerance = 5;
             bool isInLargestRect = (point.x > m_biggestRect->tl().x - tollerance && point.x < m_biggestRect->br().x + tollerance) && (point.y > m_biggestRect->tl().y - tollerance && point.y < m_biggestRect->br().y + tollerance);
-            if (isInLargestRect = point.x < middle.x && point.y > middle.y)
+            if (isInLargestRect && point.x < middle.x && point.y > middle.y)
             {
                 double pointDistanceSquared = ((middle.x - point.x) ^ 2) + ((point.y- middle.y) ^ 2);
                 if (pointDistanceSquared > distanceSquared)
