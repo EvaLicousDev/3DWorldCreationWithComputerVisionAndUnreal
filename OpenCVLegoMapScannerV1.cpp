@@ -65,7 +65,7 @@ int main()
     //Load image files
     ImageReader fileReader{};
     auto files = useTestImages ? sc_testImages : sc_imageFilesPattern; 
-    std::cout << "Trying to find image files at " << files << std::endl; 
+    std::cout << "Trying to find image files at " << files << std::endl;
     fileReader.readImages(files.c_str()); //tries finding files for 5 minutes at specified location
     auto images = fileReader.getImages(); 
 
@@ -105,6 +105,7 @@ int main()
             {
                 //---------------------------------------------------------
                 //Find the inital region of interest with simple thresholding
+                if (imageToProcess.empty()) continue; 
 
                 // We find the lighter colours in the Red channel to seperate light green and yellow form dark Green before looking 
                 // for the dark green corner pieces. Best results are achieved if two rows of lego studs remain dark green on the side

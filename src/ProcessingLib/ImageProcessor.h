@@ -73,7 +73,7 @@ namespace ImageProcessing
 
         std::weak_ptr<cv::Rect>  getPlateRectangle() { return m_biggestRect; }
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
-        cv::Rect                 findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult);
+        cv::Rect                 findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult = false);
         std::vector<cv::Rect>    findBrickLocations(cv::Mat& brickArea, bool showResult = false); 
         cv::Mat                  createHeightMapPNG(cv::Mat& heightMapData, const char* heightmapOutputPath); 
         void                     addToHeightMap(const cv::Mat& info);
@@ -94,9 +94,9 @@ namespace ImageProcessing
         cv::Rect findRectWithLargestVolium(const std::vector<cv::Rect>& boxes);
         cv::Rect findLegoWithThresholdingMask(cv::Mat imageToProcess, int lowerboundGreen, bool showGreenMask = false, bool showAllRect = false);
         cv::Rect findSquareIsh(const std::vector<cv::Point>& box);
-        cv::Rect findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
-        cv::Rect getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult); 
-        void     setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult);
+        cv::Rect findLargestVoliumChild(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult = false);
+        cv::Rect getPlateWithGreenChannel(cv::Mat unprocessedROI, bool showResult = false); 
+        void     setXCoordinatesForWhiteBricks(std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& roi, bool showResult = false);
         //---------------
 
         cv::Mat applySobel(cv::Mat& blurredBGR, int k = 3);

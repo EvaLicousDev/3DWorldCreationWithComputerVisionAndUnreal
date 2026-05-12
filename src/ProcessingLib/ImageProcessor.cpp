@@ -1,10 +1,4 @@
 #include "ImageProcessor.h"
-#include "ImageProcessor.h"
-#include "ImageProcessor.h"
-#include "ImageProcessor.h"
-#include "ImageProcessor.h"
-#include "ImageProcessor.h"
-#include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
 #include "ERRORs/ErrorOutput.h"
 #include "Histogram/ColourHistogram.h"
@@ -849,7 +843,7 @@ cv::Point2f ImageProcessing::ImageProcessor::findBL(std::vector<std::vector<cv::
 
 cv::Point2f ImageProcessing::ImageProcessor::findBR(std::vector<std::vector<cv::Point>> contours, cv::Point middle)
 {
-    //x has to be sigger and y has to be bigger, and distance to middle maximised
+    //x has to be bigger and y has to be bigger, and distance to middle maximised
     double distanceSquared = 0;
     cv::Point out(0, 0);
     for (auto cont : contours)
@@ -1134,6 +1128,7 @@ void ImageProcessing::ImageProcessor::debugInfo(cv::Mat& image)
     std::cout << "image dimensions: " << image.dims << std::endl;
 }
 
+// Function based on OpenCV 4 Computer Vision Application cookbook
 // Sharpen edges
 cv::Mat ImageProcessing::ImageProcessor::sharpen2Dedges(cv::Mat& image)
 {
@@ -1152,6 +1147,7 @@ cv::Mat ImageProcessing::ImageProcessor::sharpen2Dedges(cv::Mat& image)
     return result;
 }
 
+// Function based on OpenCV 4 Computer Vision Application cookbook
 // returns copy of image passed in with pixel values devided to fit desired colour space 
 cv::Mat ImageProcessing::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& image, int divideBy)
 {
@@ -1165,6 +1161,7 @@ cv::Mat ImageProcessing::ImageProcessor::rgbColourSpaceReductionWithIt(cv::Mat& 
     return image;
 }
 
+// Function based on OpenCV 4 Computer Vision Application cookbook
 // returns copy of image passed in with pixel values devided to fit desired colour space 
 cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction(cv::Mat& image, int divideBy)
 {
@@ -1192,6 +1189,7 @@ cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction(cv::Mat& i
     return image;
 }
 
+// Function based on OpenCV 4 Computer Vision Application cookbook
 // returns copy of image passed in with pixel values devided to fit desired colour space 
 cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction2(cv::Mat& image, int divideBy)
 {
@@ -1219,6 +1217,7 @@ cv::Mat ImageProcessing::ImageProcessor::naiveRgbColourSpaceReduction2(cv::Mat& 
     return image;
 }
 
+// Function based on OpenCV 4 Computer Vision Application cookbook
 // returns copy of image passed in with pixel values devided to fit desired colour space 
 cv::Mat ImageProcessing::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy)
 {
@@ -1250,7 +1249,7 @@ cv::Mat ImageProcessing::ImageProcessor::bitwiseRgbColourSpaceReduction(cv::Mat&
 }
 
 // Function returns the absolute value between the three colour channels in a Vec3b object
-// Function taken from OpenCV 4 cookbook
+// Function based on OpenCV 4 Computer Vision Application cookbook
 int ImageProcessing::ImageProcessor::getDistanceToTargetColour(const cv::Vec3b& colourIn, const cv::Vec3b& tragetColour) const
 {
     return abs(colourIn[0] - tragetColour[0])
