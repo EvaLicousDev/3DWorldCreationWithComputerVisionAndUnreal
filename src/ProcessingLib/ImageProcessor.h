@@ -71,6 +71,7 @@ namespace ImageProcessing
             visualiserInstance.release();
         }
 
+        cv::Mat boostValue(const cv::Mat& input, bool showResult);
         std::weak_ptr<cv::Rect>  getPlateRectangle() { return m_biggestRect; }
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
         cv::Rect                 findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult = false);
@@ -137,7 +138,6 @@ namespace ImageProcessing
         void setImageOfBricks(cv::Mat& image);
         void setWhiteBrick(cv::Mat& image);
         std::shared_ptr<cv::Mat> getBrickSample() { return imageOfBricks; }
-
     private:
         bool isWithinTollerance(cv::Rect& output); 
 

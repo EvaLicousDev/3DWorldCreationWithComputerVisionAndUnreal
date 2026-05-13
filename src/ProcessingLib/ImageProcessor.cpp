@@ -1,4 +1,5 @@
 #include "ImageProcessor.h"
+#include "ImageProcessor.h"
 #include "Histogram/SingleChannelHistogram.h"
 #include "ERRORs/ErrorOutput.h"
 #include "Histogram/ColourHistogram.h"
@@ -16,6 +17,30 @@
 void ImageProcessing::ImageProcessor::setWhiteBrick(cv::Mat& image)
 {
     whiteBrick = std::make_shared<cv::Mat>(image);
+}
+
+cv::Mat ImageProcessing::ImageProcessor::boostValue(const cv::Mat& input, bool showResult)
+{
+    cv::Mat hsv;
+    cv::Mat hsvChan[3];
+
+    input.copyTo(hsv); 
+    cv::cvtColor(hsv, hsv, cv::COLOR_BGR2HSV);
+    cv::split(hsv, hsvChan);
+
+    //hsvChan[1] *= 2; 
+    hsvChan[2] *= 2;
+    //cv::normalize(hsvChan[1], hsvChan[1], 0, 255, cv::NORM_MINMAX);
+    cv::normalize(hsvChan[2], hsvChan[2], 0, 255, cv::NORM_MINMAX);
+    cv::merge(hsvChan, 3, hsv);
+    cv::cvtColor(hsv, hsv, cv::COLOR_HSV2BGR);
+
+    if (showResult) cv::imshow("high saturation and value", hsv);
+    //if (showResult) cv::imshow("Sat", hsvChan[1]);
+    if (showResult) cv::imshow("Val", hsvChan[2]);
+    cv::waitKey(0);
+
+    return hsv; 
 }
 
 cv::Mat ImageProcessing::ImageProcessor::createRetinex(const cv::Mat& input, bool showResult)
