@@ -7,6 +7,7 @@ namespace Histogram
 {
     class ColourHistogram
     {
+        //The implemenatation is based of OpenCV 4 Computer Vision Applcation Cookbook 
         //This class is designed to contain and calculate histograms for individual brick colours specifically
         //Theory: Histogram back projection returns a likelyhood map which allows us to tell how likely a pixel is to belong to a certain colour.
         //        This information can then be thresholded to maka judgement of what the most amount of pixles in an area blong to

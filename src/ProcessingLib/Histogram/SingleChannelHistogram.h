@@ -13,6 +13,7 @@ namespace Histogram
     class SingleChannelHistogram
     {
         //This class is specifically designed to create a simpler interface for one dimensional histogram using Open CV library functions
+        //The implemenatation is based of OpenCV 4 Computer Vision Applcation Cookbook 
     public: 
         SingleChannelHistogram(cv::Mat& image1D)
         {

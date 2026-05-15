@@ -7,6 +7,7 @@ namespace Histogram
 {
     struct GraphCreator
     {
+        //The implemenatation is based of OpenCV 4 Computer Vision Applcation Cookbook 
         //draws vertical lines corresponding to the amount of pixels with the specific value of that bin [0-255]
         static cv::Mat createHistorgramGraph(cv::Mat& histogram)
         {

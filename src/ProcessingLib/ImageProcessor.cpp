@@ -774,7 +774,6 @@ std::vector<cv::Point2f> ImageProcessing::ImageProcessor::useContoursToFindCorne
                 cv::circle(orig, point, 5, CV_RGB(255, 200 - colour, colour), cv::FILLED);
                 colour += 45;
             }
-            //cv::rectangle(orig, *m_biggestRect.get(), CV_RGB(255, 0, 0), 3);
             cv::imshow("Points detected", orig);
             cv::waitKey(0);
         }
@@ -963,7 +962,6 @@ bool ImageProcessing::ImageProcessor::isWithinTollerance(cv::Rect& output)
     else
     {
         Errors::ErrorOutput(Errors::BrickCVErrors::FUNCTION_CALLED_TOO_SOON, "If this is called before the X values for the white bricks are set this will return an invalid result and produce undefined behavious.");
-       // CV_Assert(leftWhiteMarkerTL_X != -1 && rightWhiteMarkerTR_X != -1, "Invalid result due to invalid function call order"); 
         return false; 
     }
 }
