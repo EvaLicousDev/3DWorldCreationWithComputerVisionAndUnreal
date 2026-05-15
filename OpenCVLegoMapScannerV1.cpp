@@ -18,7 +18,8 @@ using namespace cv;
 using namespace ImageProcessing;
 
 // Image directory defined in CMake Lists file
-static const std::string sc_imageFilesPattern = string("Y:/LegoImages") + "/*.jpg";
+static const std::string sc_imageFilePath = string(IMAGE_DIR);
+static const std::string sc_imageFilesPattern = "Y:/LegoImages/hdr*.jpg";
 static const std::string sc_testImages        = string("C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder/HDR_MAP") + "*.jpg";
 
 
@@ -33,7 +34,8 @@ int main()
     
     //---------------------------------------------------------
     // Settings
-    bool debugOrDemoAll     = false; 
+    bool debugOrDemoAll     = true
+        ; 
     bool resetLog           = true;  // reccomended
     bool createHeightMapPNG = false; // not needed in final product version 1
     bool testCSV            = false;
@@ -42,10 +44,10 @@ int main()
     const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png";
     const char* textureOutputPath   = "C:/Users/evali/Pictures/TexMap.png";
 
-    double dynThres_LowerBoundry_LAB      = 0.85; 
-    double dynThresh_UpperBoundry_LAB     = 1.15;
-    double dynThres_LowerBoundry_LCH      = 0.98;
-    double dynThresh_UpperBoundry_LCH     = 1.02;
+    double dynThres_LowerBoundry_LAB      = 0.90; 
+    double dynThresh_UpperBoundry_LAB     = 1.10;
+    double dynThres_LowerBoundry_LCH      = 0.99;
+    double dynThresh_UpperBoundry_LCH     = 1.01;
     double weightFactor_ChromaChannel_LCH = 0.3; 
 
     int outRowsCols = 40;
@@ -65,8 +67,9 @@ int main()
     //Load image files
     ImageReader fileReader{};
     auto files = useTestImages ? sc_testImages : sc_imageFilesPattern; 
+    auto path = useTestImages ? "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder" : sc_imageFilePath;
     std::cout << "Trying to find image files at " << files << std::endl;
-    fileReader.readImages(files.c_str()); //tries finding files for 5 minutes at specified location
+    fileReader.readImages(path.c_str(), files.c_str()); //tries finding files for 5 minutes at specified location
     auto images = fileReader.getImages(); 
 
     //---------------------------------------------------------
@@ -113,9 +116,8 @@ int main()
                 cv::split(imageToProcess, splitBGR);
                 cv::Mat higherRedValueMask = splitBGR[redOrBlueYellow];
                 higherRedValueMask * 2;
-                threshold(higherRedValueMask, higherRedValueMask, 50, 255, cv::THRESH_BINARY_INV);
+                threshold(higherRedValueMask, higherRedValueMask, 100, 255, cv::THRESH_BINARY_INV);
                 medianBlur(higherRedValueMask, higherRedValueMask, 9);
-                threshold(higherRedValueMask, higherRedValueMask, 0, 100, cv::THRESH_BINARY);
 
                 //creating first mask - only pixels where the red value is < 50, so perceptually green and blue hues
                 cv::Mat greenBlueHueAreas;
@@ -124,27 +126,23 @@ int main()
                 if (debugOrDemoAll) imshow("Low Red Values Mask", greenBlueHueAreas);
                 if (debugOrDemoAll) waitKey(0);
 
+                cv::Mat labInterest;
                 greenBlueHueAreas* (1, 3, 1); //strengthen green channel - helps get complete plate in uneven lighting
-                if (debugOrDemoAll) imshow("Greener", greenBlueHueAreas);
-                if (debugOrDemoAll) waitKey(0);
+                cv::cvtColor(greenBlueHueAreas, labInterest, COLOR_BGR2Lab);
+                cv::Mat splitLAB[channels];
+                cv::split(labInterest, splitLAB);
+                cv::Mat labAxis = splitLAB[1]; 
+                normalize(labAxis, labAxis, 0, 255, NORM_MINMAX); 
+                medianBlur(labAxis, labAxis, 9);
+                threshold(labAxis, labAxis, 50, 255, cv::THRESH_BINARY_INV);
 
-                // at this point, depending on the lighting, we still have a lot of black tray in our image
-                // we now use the green channel to reduce the pixels evaluated for feature detection further
-                cv::Mat splitGreenMask[3];
-                cv::split(greenBlueHueAreas, splitGreenMask);
-                cv::Mat noLowGreenValuesMask = splitGreenMask[greenOrAxis];
-                medianBlur(noLowGreenValuesMask, noLowGreenValuesMask, 9);
-                normalize(noLowGreenValuesMask, noLowGreenValuesMask, 0, 255, NORM_MINMAX); //improve uneven light conditions - but does introduce some noise, so we only use this for initial detection
-                cv::medianBlur(noLowGreenValuesMask, noLowGreenValuesMask, 9);
-
-                cv::threshold(noLowGreenValuesMask, noLowGreenValuesMask, 50, 255, THRESH_BINARY);
-                if (debugOrDemoAll) imshow("Green Channel value 50 - 255", noLowGreenValuesMask);
+                if (debugOrDemoAll) imshow("Greenest", labAxis);
                 if (debugOrDemoAll) waitKey(0);
 
                 if (debugOrDemoAll)
                 {
                     cv::Mat noLowRedGreen;
-                    greenBlueHueAreas.copyTo(noLowRedGreen, noLowGreenValuesMask);
+                    greenBlueHueAreas.copyTo(noLowRedGreen, labAxis);
 
                     imshow("Presumed Green areas", noLowRedGreen);
                     waitKey(0);
@@ -158,7 +156,7 @@ int main()
                 // For this we go over all the contours, create a bounding box around the largest
                 // and use the center of said bounding box to find the outer corners of the lego plate
 
-                auto presumedROI = processor.useContoursToFindCorners(imageToProcess, noLowGreenValuesMask, debugOrDemoAll, debugOrDemoAll);
+                auto presumedROI = processor.useContoursToFindCorners(imageToProcess, labAxis, debugOrDemoAll, debugOrDemoAll);
                 if (presumedROI.empty()) continue;
 
                 auto plateRectangle = processor.getPlateRectangle();
@@ -219,18 +217,35 @@ int main()
                     if (debugOrDemoAll) cv::imshow("Bricks above board", exampleBricks);
                     if (debugOrDemoAll) waitKey(0);
 
-                    //get the location of our example bricks for backprojection and template matching
-                    auto bricks = processor.findBrickLocations(exampleBricks, debugOrDemoAll);
-                    if (bricks.empty()) continue;
-
-                    //debugOrDemoAll = true;
-                    std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
-                        {
-                            return left.tl().x < right.tl().x;
-                        });
-
+                    //---------------------------------------------------------------------------------------------
+                    //Try and identify all bricks in the example area
+                    cv::Mat boostedBricks = processor.boostValue(exampleBricks, debugOrDemoAll);
+                    cv::Mat brickExamples[2] = {exampleBricks, boostedBricks}; 
                     int numberOfColours = sizeof(sc_coloursInUse) / sizeof(sc_coloursInUse[0]);
-                    if (bricks.size() != (numberOfColours + 1))
+                    std::vector<cv::Rect> bricks{}; 
+
+                    for (auto brickExmpl : brickExamples)
+                    {
+                        //get the location of our example bricks for backprojection and template matching
+                        bricks = processor.findBrickLocations(brickExmpl, debugOrDemoAll);
+                        if (bricks.empty())
+                        {
+                            continue;
+                        }
+
+                        //debugOrDemoAll = true;
+                        std::sort(bricks.begin(), bricks.end(), [](const cv::Rect& left, const  cv::Rect& right)
+                            {
+                                return left.tl().x < right.tl().x;
+                            });
+
+                        if (bricks.size() == (numberOfColours + 1))
+                        {
+                            break; //Presumably found rectangles
+                        }
+                    }
+
+                    if (bricks.size() != (numberOfColours + 1) || bricks.empty())
                     {
                         ErrorOutput(BrickCVErrors::EXAMPLE_BRICKS_ERROR, "Did not correctly identify", std::to_string(numberOfColours).c_str(), "colours in the exampleBricks image.");
                         continue; //this would scilently break the application, process next image instead
@@ -271,6 +286,8 @@ int main()
                         index++;
                     }
 
+                    debugOrDemoAll = true; 
+
                     detector.setBrickColourMap(brickScalarMap);
 
                     // now we create a "heatmap" of mapping the colours to the identified example bricks
@@ -281,9 +298,11 @@ int main()
                     std::map<BrickColour, std::shared_ptr<cv::Mat>> projections;
                     for (const auto [colourName, scalar] : brickScalarMap)
                     {
+                        cv::Mat interest = legoPlate; 
+
                         //make image of colour value and use it to identify pixels within threshold
                         auto meanColour = cv::Mat(30, 30, CV_8UC3, scalar);
-                        auto projectRange = detector.findPixelsWithColourInRange(legoPlate, scalar, dynThres_LowerBoundry_LAB, dynThresh_UpperBoundry_LAB);
+                        auto projectRange = detector.findPixelsWithColourInRange(interest, scalar, dynThres_LowerBoundry_LAB, dynThresh_UpperBoundry_LAB);
 
                         // make image of individual brick
                         auto rect = brickColourMap.at(colourName);
@@ -291,7 +310,8 @@ int main()
 
                         // use brick image and apply template matching - if lighting is very uneven this will fail 
                         cv::Mat minnimaMostLikely;
-                        cv::matchTemplate(legoPlate, brickMat, minnimaMostLikely, TemplateMatchModes::TM_SQDIFF_NORMED);
+                        cv::matchTemplate(interest, brickMat, minnimaMostLikely, TemplateMatchModes::TM_SQDIFF_NORMED);
+                        if (colourName == BrickColour::PURPLE) minnimaMostLikely *= 1.5; 
 
                         // template matching creates a map with a global minnimum to represent the best match, so we invert it
                         cv::Mat resultMap = 1.0 - minnimaMostLikely;
@@ -299,24 +319,52 @@ int main()
                         cv::medianBlur(resultMap, resultMap, 9);
 
                         // We repeat the process for the Chroma and Hue channel of the LCH colour model
-                        auto lchHueChannel = detector.findPixelsWithColourInRangeForChannel(legoPlate, scalar, dynThres_LowerBoundry_LCH, dynThresh_UpperBoundry_LCH, ChannelType::LCHuv_HUE, false);
-                        auto lchCromaChannel = detector.findPixelsWithColourInRangeForChannel(legoPlate, scalar, dynThres_LowerBoundry_LCH, dynThresh_UpperBoundry_LCH, ChannelType::LCHuv_CHROMA, false);
+                        auto lchHueChannel = detector.findPixelsWithColourInRangeForChannel(interest, scalar, dynThres_LowerBoundry_LCH, dynThresh_UpperBoundry_LCH, ChannelType::LCHuv_HUE, false);
+                        auto lchCromaChannel = detector.findPixelsWithColourInRangeForChannel(interest, scalar, dynThres_LowerBoundry_LCH, dynThresh_UpperBoundry_LCH, ChannelType::LCHuv_CHROMA, false);
                         cv::Mat chromaHue;
+
+                        if (debugOrDemoAll)
+                        {
+                            cv::imshow("LCH hue projection", lchHueChannel);
+                            cv::imshow("LCH chroma projection", lchCromaChannel);
+
+                            cv::waitKey(0);
+                        }
 
                         // as a result of system testing it was decided to do a weighted addition 
                         // the chroma channel does provide valuable information regaring shades, but skews results if considered with the same ratio as the hue channel
                         // 0.3 was chosen after retesting with a batch of test images capturing lighting conditions outline in FR 1
-                        cv::add(lchHueChannel, lchCromaChannel * weightFactor_ChromaChannel_LCH, chromaHue);
+                        if (colourName == BrickColour::YELLOW || colourName == BrickColour::LIGHT_BLUE || colourName == BrickColour::LIGHT_GREEN || colourName == BrickColour::BROWN)
+                        {
+                            chromaHue = lchCromaChannel; 
+                        }
+                        else if (colourName == BrickColour::RED)
+                        {
+                            chromaHue = lchHueChannel;
+                        }
+                        else
+                        {
+                            cv::add(lchHueChannel, lchCromaChannel* weightFactor_ChromaChannel_LCH, chromaHue);
+                        }
+
                         cv::medianBlur(chromaHue, chromaHue, 9);
+                        auto elipsicalKernal = cv::getStructuringElement(cv::MorphShapes::MORPH_ELLIPSE, cv::Size(7, 7));
+                        cv::morphologyEx(chromaHue, chromaHue, cv::MorphTypes::MORPH_CLOSE, elipsicalKernal); //close gaps
+
+                        if (debugOrDemoAll)
+                        {
+                            cv::imshow("LCH chroma", chromaHue);
+                            cv::waitKey(0);
+                        }
 
                         // ensure images are same size and add - shouldn't be needed, just done for sanity
                         cv::resize(lchHueChannel, lchHueChannel, cv::Size(legoPlate.cols, legoPlate.rows));
                         cv::resize(resultMap, resultMap, cv::Size(legoPlate.cols, legoPlate.rows));
                         cv::resize(projectRange, projectRange, cv::Size(legoPlate.cols, legoPlate.rows));
 
-                        // The accuracy of the detection of brown & white rely heavily on the (otherwise) unprocessed channel in LCH
                         // so we limit the processing of that channel for efficency reasons 
-                        if (colourName != BrickColour::WHITE && colourName != BrickColour::BROWN) cv::add(resultMap, chromaHue, resultMap);
+                        if (colourName != BrickColour::WHITE && colourName != BrickColour::PURPLE) cv::add(resultMap, chromaHue, resultMap);
+                        if (colourName == BrickColour::PURPLE || colourName == BrickColour::BROWN) resultMap * 1.5; 
                         cv::add(resultMap, projectRange, resultMap);
 
                         projections.emplace(colourName, std::make_shared<cv::Mat>(resultMap));
@@ -356,8 +404,6 @@ int main()
                             cv::waitKey(0);
                         }
                     }
-
-                    // debugOrDemoAll = true;
 
                     //------------------------------------------------------------------------
                     //generate output texture for biome mapping
@@ -547,6 +593,7 @@ int main()
                 }
                 if (success) break;
             }
+            if (success) break;
         } 
         else
         {

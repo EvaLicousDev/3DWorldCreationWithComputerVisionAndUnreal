@@ -1,8 +1,5 @@
 #pragma once
 
-// To accomodate LCHuv addtional logic would need to be implemented. MatLab offers logic to convert RGB to LCH images 
-// https://uk.mathworks.com/matlabcentral/fileexchange/100943-rgb_lch_conversion?s_tid=FX_rc2_behav
-
 namespace BrickCV
 {
     enum ChannelType : int8_t

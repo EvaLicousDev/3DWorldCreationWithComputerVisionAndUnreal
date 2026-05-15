@@ -29,26 +29,24 @@ std::vector<std::weak_ptr<cv::Mat>> ImageProcessing::ImageReader::getImages()
     return outvector;
 }
 
-void ImageProcessing::ImageReader::readImages(const char* imagesPath)
+void ImageProcessing::ImageReader::readImages(const char* filePath, const char* imagesPath)
 {
     auto timerStart = std::chrono::high_resolution_clock().now(); 
+    std::cout << "Finding images at" << imagesPath << std::endl;
 
     while (m_fileNames.empty())
     {
         //get all filenames for a specified pattern 
-        if (filesystem::exists(filesystem::path(imagesPath)))
+        cv::String folderpath = imagesPath;
+        cv::glob(folderpath, m_fileNames, false);
+        for (auto file : m_fileNames)
         {
-            std::cout << "Found the filepath!!" << std::endl; 
-            cv::String folderpath = imagesPath;
-            cv::glob(folderpath, m_fileNames, false);
-
-            for (auto file : m_fileNames)
-            {
-                auto image = cv::imread(file, cv::IMREAD_COLOR);
-                auto pointer = std::make_shared<cv::Mat>(image);
-                this->m_images.emplace_back(pointer);
-            }
+            auto image = cv::imread(file, cv::IMREAD_COLOR);
+            auto pointer = std::make_shared<cv::Mat>(image);
+            this->m_images.emplace_back(pointer);
         }
+
+        if (!m_images.empty()) break; 
 
         auto timerCheck = std::chrono::high_resolution_clock().now();
         auto timePassed = std::chrono::duration_cast<std::chrono::seconds>(timerCheck - timerStart); 

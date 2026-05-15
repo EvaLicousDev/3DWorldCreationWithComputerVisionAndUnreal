@@ -55,68 +55,8 @@ namespace brickColourSVM
             // -------------------------------------------------------------------------------
 
             // ---------------------Format trainings data for OpenCV---------------------------
-            /*
-            auto examples = trainingData.size();
-            std::vector<std::vector<float>> reformattedTrainingData;
-            for (auto dataPoint : trainingData)
-            {
-                std::vector<float> dataVector; 
-                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[0]); //Red
-                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[1]); //Green
-                dataVector.emplace_back(dataPoint.bgrMeanValues.get()[2]); //Blue
-                dataVector.emplace_back(dataPoint.histogramLAB_Achannel();
-            }
 
-                
-            // Train the SVM
-            cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
-            svm->setType(cv::ml::SVM::C_SVC);
-            svm->setKernel(cv::ml::SVM::RBF);
-            svm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, 10000, 1e-6));
-            svm->train(trainingDataMat, ROW_SAMPLE, labelsMat);
-
-            // Data for visual representation
-            int width = 512, height = 512;
-            Mat image = Mat::zeros(height, width, CV_8UC3);
-
-            // Show the decision regions given by the SVM
-            Vec3b green(0, 255, 0), blue(255, 0, 0);
-            for (int i = 0; i < image.rows; i++)
-            {
-                for (int j = 0; j < image.cols; j++)
-                {
-                    Mat sampleMat = (Mat_<float>(1, 2) << j, i);
-                    float response = svm->predict(sampleMat);
-
-                    if (response == 1)
-                        image.at<Vec3b>(i, j) = green;
-                    else if (response == -1)
-                        image.at<Vec3b>(i, j) = blue;
-                }
-            }
-
-            // Show the training data
-            int thickness = -1;
-            circle(image, Point(501, 10), 5, Scalar(0, 0, 0), thickness);
-            circle(image, Point(255, 10), 5, Scalar(255, 255, 255), thickness);
-            circle(image, Point(501, 255), 5, Scalar(255, 255, 255), thickness);
-            circle(image, Point(10, 501), 5, Scalar(255, 255, 255), thickness);
-
-            // Show support vectors
-            thickness = 2;
-            Mat sv = svm->getUncompressedSupportVectors();
-
-            for (int i = 0; i < sv.rows; i++)
-            {
-                const float* v = sv.ptr<float>(i);
-                circle(image, Point((int)v[0], (int)v[1]), 6, Scalar(128, 128, 128), thickness);
-            }
-
-            cv::imwrite("result.png", image);        // save the image
-
-            cv::imshow("SVM Simple Example", image); // show it to the user
-            cv::waitKey(0);
-            */
+            //...
         }
 
     private:

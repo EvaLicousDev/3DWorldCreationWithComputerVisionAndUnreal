@@ -115,7 +115,7 @@ cv::Mat AbsColourDistance::ColourDetector::findPixelsWithColourInRangeForChannel
     // Get the channel we want 
     if (channel == ChannelType::LCHuv_LUMINANCE || channel == ChannelType::LAB_LUMINANCE || channel == ChannelType::LUV_LUMINANCE)
     {
-        // same for all 3 models
+        // same for all 3 channels
         img = individualChannelImg[0];
         scal = individualChannelScalar[0];
     }
@@ -317,8 +317,8 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvHUEMat(const cv::Mat& labACha
     //loop over all pixels in the images and apply transform to outpu
     for (auto rowIndex = 0; rowIndex < rows; rowIndex++)
     {
-        auto labAPx = labA.ptr<float>(rowIndex);
-        auto labBPx = labB.ptr<float>(rowIndex);
+        auto labAPx = labA.ptr<double>(rowIndex);
+        auto labBPx = labB.ptr<double>(rowIndex);
         auto outPx = outMask.ptr<double>(rowIndex);
 
         for (auto columnIndex = 0; columnIndex < cols; columnIndex++)
@@ -328,7 +328,7 @@ cv::Mat AbsColourDistance::ColourDetector::getLCHuvHUEMat(const cv::Mat& labACha
             auto pxValue = std::atan((labBPx[columnIndex] / labAPx[columnIndex])) * (180.0 / sc_pi_approx);
             outPx[columnIndex] = pxValue;
         }
-    }
+    } 
     return outMask;
 }
 

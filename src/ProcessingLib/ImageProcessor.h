@@ -28,7 +28,7 @@ namespace ImageProcessing
 {
     using imagePtr = std::shared_ptr<cv::Mat>;
 
-    // previous scale was adjusted in system testing for efficency reasons
+    // previous scale was adjusted for implementation reasons to do on the unreal engine code side
     // static const constexpr int sc_pixelsInHeightMap  = 2017*2; //https://dev.epicgames.com/documentation/en-us/unreal-engine/landscape-technical-guide-in-unreal-engine
     static const constexpr int sc_pixelsInHeightMap = 400; 
     static const constexpr int sc_coloursToIdentify  = 8;
@@ -42,9 +42,6 @@ namespace ImageProcessing
         /*
          * This class was created to encapsulate the preprocessing functions needed for detection of lego bricks in the images
          * provided by the camera.
-         *
-         * Goal:
-         * Find the locations of different colour lego pieces in the image.
          * 
          * Colour spaces used to identify bricks are primarely LAB and LCH. Please also view BrickCVEnums/BrickColourEnum.h for more comments.
          * LAB was chosen due to the initial literature review and testing & LCH was added to improve detection further
@@ -71,6 +68,7 @@ namespace ImageProcessing
             visualiserInstance.release();
         }
 
+        cv::Mat boostValue(const cv::Mat& input, bool showResult);
         std::weak_ptr<cv::Rect>  getPlateRectangle() { return m_biggestRect; }
         std::vector<cv::Point2f> useContoursToFindCorners(cv::Mat original, cv::Mat& imageToProcess, bool showBlackMask = false, bool showAllRect = false);
         cv::Rect                 findChildCorners(int largestVoliumIndex, const std::vector<cv::Rect>& boxes, std::vector<cv::Vec4i> hierarchy, std::vector<std::vector<cv::Point>> contours, cv::Mat& preProcessedGrey, bool showResult = false);
@@ -109,8 +107,6 @@ namespace ImageProcessing
         cv::Mat createThresholdMask(cv::Mat& greyImage);
         cv::Mat backprojectHistogram(cv::Mat& inputImage, cv::Mat& regionOfInterest, int threshold); 
         
-        // early development [DEPRECATED] image processing functions using pixle wise operations to reduce colour range
-        // was fased out as the decision to not controll lighting made using this methodolgy intorduce too unreliable results
         cv::Mat naiveRgbColourSpaceReduction(cv::Mat& image,   int divideBy = 16);
         cv::Mat naiveRgbColourSpaceReduction2(cv::Mat& image,  int divideBy = 16);
         cv::Mat bitwiseRgbColourSpaceReduction(cv::Mat& image, int divideBy = 16);
@@ -137,7 +133,6 @@ namespace ImageProcessing
         void setImageOfBricks(cv::Mat& image);
         void setWhiteBrick(cv::Mat& image);
         std::shared_ptr<cv::Mat> getBrickSample() { return imageOfBricks; }
-
     private:
         bool isWithinTollerance(cv::Rect& output); 
 
