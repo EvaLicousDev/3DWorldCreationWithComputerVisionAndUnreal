@@ -12,7 +12,7 @@ to build their own version if they want to.
 It also includes a video breakdown of the core logic implemented in UE5 to spawn the procedural mesh and sample it at runtime below.
 
 ----------------------------------------------------------------------------------------
-DESIGN SCATCH
+DESIGN SKETCH
 ----------------------------------------------------------------------------------------
 <img width="944" height="511" alt="image" src="https://github.com/user-attachments/assets/883123fd-608f-4026-910c-93dfa06db7ef" />
 
