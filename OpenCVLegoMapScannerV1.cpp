@@ -20,7 +20,7 @@ using namespace ImageProcessing;
 // Image directory defined in CMake Lists file
 static const std::string sc_imageFilePath = string(IMAGE_DIR);
 static const std::string sc_imageFilesPattern = "Y:/LegoImages/hdr*.jpg";
-static const std::string sc_testImages        = string("C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder/HDR_MAP") + "*.jpg";
+static const std::string sc_testImages        = string("*/ImageFolder/HDR_MAP") + "*.jpg";
 
 
 // IMPORTANT INFORMATION:
@@ -41,8 +41,8 @@ int main()
     bool testCSV            = false;
     bool useTestImages      = false; 
 
-    const char* heightMapOutputPath = "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/OutputFolder/heightMap.png";
-    const char* textureOutputPath   = "C:/Users/evali/Pictures/TexMap.png";
+    const char* heightMapOutputPath = "*/OutputFolder/heightMap.png";
+    const char* textureOutputPath   = "*/TexMap.png";
 
     double dynThres_LowerBoundry_LAB      = 0.90; 
     double dynThresh_UpperBoundry_LAB     = 1.10;
@@ -51,7 +51,7 @@ int main()
     double weightFactor_ChromaChannel_LCH = 0.3; 
 
     int outRowsCols = 40;
-    const char* outputfileName = "C:/Users/evali/Pictures/heightMapPoints.csv";
+    const char* outputfileName = "*/heightMapPoints.csv";
 
 
     //---------------------------------------------------------
@@ -67,7 +67,7 @@ int main()
     //Load image files
     ImageReader fileReader{};
     auto files = useTestImages ? sc_testImages : sc_imageFilesPattern; 
-    auto path = useTestImages ? "C:/Users/evali/FinalProjectFiles/OpenCVModel/OpenCVLegoMapScannerV1/ImageFolder" : sc_imageFilePath;
+    auto path = useTestImages ? "*/OpenCVLegoMapScannerV1/ImageFolder" : sc_imageFilePath;
     std::cout << "Trying to find image files at " << files << std::endl;
     fileReader.readImages(path.c_str(), files.c_str()); //tries finding files for 5 minutes at specified location
     auto images = fileReader.getImages(); 
