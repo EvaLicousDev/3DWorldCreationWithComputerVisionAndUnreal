@@ -59,7 +59,7 @@ public:
 	void GetPointDataFromCSV();
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "0_CSV_POINTS_FILEPATH")
-	FString csvFilePath{ TEXT("C:/Users/evali/Pictures/heightMapPoints.csv") };
+	FString csvFilePath{ TEXT("*/heightMapPoints.csv") };
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "1_ScaleBetweenPoints")
 	double Scale{ 10000.0 }; //UE defaults to 100 units = 1 m 
