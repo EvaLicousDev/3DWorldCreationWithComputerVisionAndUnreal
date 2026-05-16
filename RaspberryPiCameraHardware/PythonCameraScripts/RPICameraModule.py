@@ -7,16 +7,18 @@ from pathlib import Path
 from datetime import datetime
 
 SECONDS_PER_HOUR = 3600
-FRAM_VALUE_ADJUSTMENT_RATIO = 3.0
-OUTPUT_DIR = Path("/home/evaliciousdev/cvImages") #shared folder for samba server acessible by windows
+IMAGES_PER_CAPTURE_ARRAY = 6.0
+OUTPUT_DIR = Path("/home/*/cvImages/LegoImages") #shared folder for samba server acessible by windows laptop
 
 __name__ = "camera_setup_module"
 
-DAYLIGHT      = "Daylight"
-TWILIGHT      = "Twilight"
-HIGHLIGHT     = "High Light"
-SUPERLOWLIGHT = "Super LowLight"
-imageNames    = [DAYLIGHT, TWILIGHT, HIGHLIGHT, SUPERLOWLIGHT]
+AUTO          = "6_Auto"
+DAYLIGHT      = "1_Daylight"
+TWILIGHT      = "2_Twilight"
+HIGHLIGHT     = "5_HighLight"
+SUPERLOWLIGHT = "4_SuperLowLight"
+TUNGSTEN      = "3_Tungsten"
+imageNames    = [AUTO, DAYLIGHT, TWILIGHT, HIGHLIGHT, SUPERLOWLIGHT, TUNGSTEN]
 
 #------------------------------------------------------------------------------------
 # ----------------------------------CAMERA SETTINGS----------------------------------
@@ -28,10 +30,10 @@ imageNames    = [DAYLIGHT, TWILIGHT, HIGHLIGHT, SUPERLOWLIGHT]
 # on experimentation.
 #
 # The following principles apply to the pre-defined settings:
-# - If there is glards we need to lower the image birghtness & set the auto white balange to flurecent or cloud
-#     Auto White blanance - AwbMode:
+# - If there is glares we need to lower the image brightness & set the auto white balance to florescent or cloud
+#     Auto White balance - AwbMode:
 #     0 = Auto, 1 = Tungesten, 2 = Flurecent, #3 = Indoor, #4 = Daylight, 5 = Cloudy
-# - Colour Gain messes with the actual RGB value prediction but can be used in very low light for accaptable results
+# - Colour Gain messes with the actual RGB value prediction but can be used in very low light for acceptable results
 # - Contrast & Stauration are slightly turned up in all modes: The darker the higher these values are
 # - Auto focus is always on
 # - Increased exposure time is recommended for low light
@@ -40,8 +42,8 @@ imageNames    = [DAYLIGHT, TWILIGHT, HIGHLIGHT, SUPERLOWLIGHT]
 class Cam_Controls:
     __name__ = "Camera_Controls"
     
-    exposure_normal = 10000 
-    gain_normal     = 1.0
+    exposure_normal = None
+    gain_normal     = None
     controls        = None
     
     #------------------------------------------------------------------------------------
@@ -53,8 +55,8 @@ class Cam_Controls:
     
     #------------------------------------------------------------------------------------
     def __init__(self, exposure, gain):
-        exposure_normal = exposure
-        gain_normal = gain
+        self.exposure_normal = exposure
+        self.gain_normal = gain
         print("Creating new camera instance")
         return
     
@@ -66,14 +68,25 @@ class Cam_Controls:
     
     #------------------------------------------------------------------------------------
     def set_capture_modes(self):
+                # any well lit area with causing not too much glare
+        controls_auto = {"AfMode":2, #continuous autofocus
+                            "AeEnable": False, #manually control exposure and gain
+                            "ExposureTime": self.exposure_normal,
+                            "AnalogueGain": self.gain_normal,
+                            "AwbEnable": True,
+                            "AwbMode": 0, #auto 
+                            "Contrast":1.0,
+                            "Saturation":1.0,
+                            "Brightness":-0.2
+                            }
+        
         # any well lit area with causing not too much glare
         controls_daylight = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
                             "ExposureTime": self.exposure_normal,
                             "AnalogueGain": self.gain_normal,
-                            "ColourGains":(0.0,0.0),
                             "AwbEnable": True,
-                            "AwbMode": 5, 
+                            "AwbMode": 4, #daylight 
                             "Contrast":1.3,
                             "Saturation":1.1,
                             "Brightness":-0.3
@@ -82,9 +95,8 @@ class Cam_Controls:
         # this cannot completly offse glare, but does help a lot 
         controls_bright_light = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
-                            "ExposureTime": int(self.exposure_normal*0.9),
-                            "AnalogueGain": int(self.gain_normal*1.2),
-                            "ColourGains":(0.0,0.0),
+                            "ExposureTime": int(self.exposure_normal*0.8),
+                            "AnalogueGain": int(self.gain_normal*0.9),
                             "AwbEnable": True,
                             "AwbMode": 2, #Flurecent
                             "Contrast":1.3,
@@ -95,11 +107,12 @@ class Cam_Controls:
         controls_twilight = {"AfMode":2, #continuous autofocus
                             "AeEnable": False, #manually control exposure and gain
                             "ExposureTime": int(self.exposure_normal*1.2),
-                            "AnalogueGain": int(self.gain_normal),
-                            "AwbEnable": False, #Colour gain is mutually exclusive with Awb modes
+                            "AnalogueGain": int(self.gain_normal*1.2),
+                            "AwbEnable": True,
+                            "AwbMode": 4, #indoors
                             "Contrast":1.5,
-                            "Saturation":1.3,
-                            "Brightness":-0.2
+                            "Saturation":1.5,
+                            "Brightness": -0.2
                             }
         
         #this one will result in very over exposed images in most light, but works well in darker setting
@@ -107,13 +120,31 @@ class Cam_Controls:
                             "AeEnable": False, #manually control exposure and gain
                             "ExposureTime": int(self.exposure_normal*1.5),
                             "AnalogueGain": int(self.gain_normal*1.2),
-                            "AwbEnable": False, #Colour gain is mutually exclusive with Awb modes
-                            "ColourGains":(1.2,1.2),
+                            "AwbEnable": True,
+                            "AwbEnable": 5, #cloudy
                             "Contrast":1.3,
                             "Saturation":1.5,
-                            "Brightness":0.7
+                            "Brightness":0.3
                             }
-        self.controls = [controls_daylight, controls_twilight, controls_super_low_light, controls_bright_light]
+        
+        # for inside with warm lighting and no natural light
+        controls_tungsten = {"AfMode":2, #continuous autofocus
+                            "AeEnable": False, #manually control exposure and gain
+                            "ExposureTime": int(self.exposure_normal * 1.2),
+                            "AnalogueGain": int(self.gain_normal),
+                            "AwbEnable": True,
+                            "AwbEnable": 1, #tungsten
+                            "Contrast":1.2,
+                            "Saturation":1.0,
+                            "Brightness":-0.1 #low brightness to counter glare
+                            }
+        
+        self.controls = [controls_auto,
+                         controls_daylight,
+                         controls_twilight,
+                         controls_super_low_light,
+                         controls_bright_light,
+                         controls_tungsten]
         
 #------------------------------------------------------------------------------------
 #--------------------------------HDR image creator-----------------------------------
@@ -142,15 +173,19 @@ class HDR_Img_Creator:
     def get_hdr(self):
         return self.output_image_HDR
     #------------------------------------------------------------------------------------
-    def set_up_merge_modes(self, short, short2, normal, long, long2, long3):
-        merge_super_low_light = [short2, normal, normal, long, long2, long3]
-        merge_twilight        = [short, short2, normal, normal, long]
-        merge_daylight        = [short, short2, normal, normal, long, long2]
-        merge_high_light      = [short, short2, short2, normal, long]
-        self.merge_modes = {DAYLIGHT:  merge_daylight ,
-                             TWILIGHT:  merge_twilight,
-                             HIGHLIGHT: merge_high_light,
-                             SUPERLOWLIGHT: merge_super_low_light }
+    def set_up_merge_modes(self, short, short2, normal, long, long2, long3): # all need to have 
+        merge_auto = [short, short2, normal, long, long2, long3]
+        merge_super_low_light = [normal, normal, long, long, long2, long3]
+        merge_twilight        = [normal, normal, long, long, long2, long3]
+        merge_daylight        = [short, normal, normal, normal, long, long2]
+        merge_high_light      = [short, short2, short2, normal, long, long]
+        merge_tungsten        = [short2, short2, normal, long, long, long2]
+        self.merge_modes = {AUTO: merge_auto,
+                            DAYLIGHT:  merge_daylight ,
+                            TWILIGHT:  merge_twilight,
+                            HIGHLIGHT: merge_high_light,
+                            SUPERLOWLIGHT: merge_super_low_light,
+                            TUNGSTEN: merge_tungsten}
     #------------------------------------------------------------------------------------    
     def merge_arrays(self, normal, capture_mode, filename):
         allInit = self.capture_arrays is not None and self.capture_mode is not None and self.image_name is not None and self.normal_name is not None and self.metadata_name is not None
@@ -163,7 +198,7 @@ class HDR_Img_Creator:
             self.output_image_normal = normal
             
             cv2.imwrite(f"{filename}", self.output_image_HDR)
-            #cv2.imwrite(f"normal_{capture_mode}", normal)
+            cv2.imwrite(f"/home/evaliciousdev/cvImages/LegoImages/{capture_mode}.png", self.output_image_normal)
         else:
             raise("Trying to merge images, but capture array is empty. Capture mode: {self.capture_mode} Image name: {self.image_name}")
     
@@ -203,6 +238,7 @@ class HDR_Img_Camera:
     merge_mode = None
     normal_exposure = None
     normal_analgue_gain = None
+    estimated_lux = None
     
     current_normal_images = {DAYLIGHT:None ,
                              TWILIGHT: None,
@@ -220,34 +256,32 @@ class HDR_Img_Camera:
         for image in self.current_normal_images:
             output_array.append(image)
         return output_array
-    
-    #------------------------------------------------------------------------------------
-    # The camera module 3 adjusts to environmental conditions automatically unless explicitely told otherwithse
-    # The following function capitalises of this to gain the recommended values for normal image capture
-    # and then creates an instance of the Cam_controls class
-    def startCam(self):
-        
-        # start and show camera so view can be adjusted
-        self.camera_instance.start(show_preview=True)
-        self.camera_instance.title_fields = ["ExposureTime", "AnalogueGain"]
-        
-        #set up remaining data
-        time.sleep(2) #give the camera time to auto adjust to light conditions
-        self.metadata = self.camera_instance.capture_metadata()
-        time.sleep(1)
-        self.normal_exposure = self.metadata["ExposureTime"]
-        self.normal_analogue_gain = self.metadata["AnalogueGain"] * self.metadata["DigitalGain"]
-        
-        self.controls = Cam_Controls(exposure = self.normal_exposure, gain = self.normal_analogue_gain)        
-        self.controls.set_capture_modes()
-        
-        #Wait for user to set up camera with preview
-        input("Pi camera set up controls and capture modes. Press enter to continue.")
-        self.camera_instance.stop_preview()
-        self.camera_instance.stop()
         
     #------------------------------------------------------------------------------------
     def capture_hdr_set(self):
+                # start and show camera so view can be adjusted
+        self.camera_instance.start(show_preview=True)
+        self.camera_instance.title_fields = ["ExposureTime", "AnalogueGain", "Lux"]
+        
+        #set up remaining data
+        time.sleep(3) #give the camera time to auto adjust to light conditions
+        self.metadata = self.camera_instance.capture_metadata()
+        time.sleep(1)
+        self.normal_exposure = self.metadata["ExposureTime"]
+        self.normal_analogue_gain = self.metadata["AnalogueGain"]
+        self.estimated_lux = self.metadata["Lux"]
+        time.sleep(1)
+        
+        self.controls = Cam_Controls(exposure = self.normal_exposure, gain = self.normal_analogue_gain)
+        time.sleep(1)
+        self.controls.set_capture_modes()
+        
+        #Wait for user to set up camera with preview
+        #input("Pi camera set up controls and capture modes. Press enter to continue.")
+        time.sleep(15)
+        self.camera_instance.stop_preview()
+        self.camera_instance.stop()
+        
         self.camera_instance.configure(self.configuration)
         timestamp = datetime.now().strftime("Fram{frameNumber}_%H_%M_%S")
         metadata_timestamp = datetime.now().strftime("%d_%m_%H_M%")
@@ -262,15 +296,16 @@ class HDR_Img_Camera:
             self.camera_instance.set_controls(control_set)
             print(f"Camera Settings: {self.camera_instance.stream_configuration('main')}")
             
-            shortest_exposure    = int(self.normal_exposure / FRAM_VALUE_ADJUSTMENT_RATIO)
-            short_exposure       = int(shortest_exposure*2)
-            long_exposure        = int(self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO)
-            longer_exposure      = int((self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO) + short_exposure)
-            longest_exposure     = int(self.normal_exposure * FRAM_VALUE_ADJUSTMENT_RATIO * FRAM_VALUE_ADJUSTMENT_RATIO)
-            time.sleep(0.5)
+            shortest_exposure    = int(self.normal_exposure / (IMAGES_PER_CAPTURE_ARRAY*2))
+            short_exposure       = int(shortest_exposure/IMAGES_PER_CAPTURE_ARRAY)
+            long_exposure        = int(self.normal_exposure * IMAGES_PER_CAPTURE_ARRAY)
+            longer_exposure      = int((self.normal_exposure * IMAGES_PER_CAPTURE_ARRAY) + short_exposure)
+            longest_exposure     = int(self.normal_exposure * IMAGES_PER_CAPTURE_ARRAY * 2 + short_exposure)
             
             #normal
-            frameNumber = 1 
+            frameNumber = 1
+            self.camera_instance.set_controls({"ExposureTime" : self.normal_exposure, "AnalogueGain": self.normal_analogue_gain})
+            time.sleep(0.5)
             self.camera_instance.start()
             normal = self.camera_instance.capture_array()
             self.camera_instance.stop()
@@ -278,7 +313,7 @@ class HDR_Img_Camera:
             
             #shortest
             frameNumber = 2
-            self.camera_instance.set_controls({"ExposureTime" : shortest_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : shortest_exposure, "AnalogueGain": (self.normal_analogue_gain*4)})
             time.sleep(0.5)
             self.camera_instance.start()
             shortest = self.camera_instance.capture_array()
@@ -288,7 +323,7 @@ class HDR_Img_Camera:
             
             #short 
             frameNumber = 3
-            self.camera_instance.set_controls({"ExposureTime" : short_exposure})
+            self.camera_instance.set_controls({"ExposureTime" : short_exposure, "AnalogueGain": (self.normal_analogue_gain*2)})
             time.sleep(0.5)
             self.camera_instance.start()
             short = self.camera_instance.capture_array()
@@ -326,6 +361,7 @@ class HDR_Img_Camera:
             metadata_filename = OUTPUT_DIR / f"hdr_{timestamp}_metadata.txt"
             imagename_normal = OUTPUT_DIR / f"normal_{timestamp}.jpg"
             
+            
             creator = HDR_Img_Creator(shortest,
                                       short,
                                       normal,
@@ -347,8 +383,8 @@ class HDR_Img_Camera:
         
     def __init__(self):
         print("Creating new camera instance")
-        self.startCam()
         return
     
     def __repr__(self) -> str:
         return f"{type(self).__name__}(normal_expoure={self.normal_expoure}, normal_analogue_gain={self.normal_analogue_gain})"
+
