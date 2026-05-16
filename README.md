@@ -107,7 +107,7 @@ cross-compliable (though this does require accommodating the various compiler ve
 ```
 
 ----------------------------------------------------------------------------------------
-ARCHITECTURE
+TOOLS SETUP
 ----------------------------------------------------------------------------------------
 
 Visual Studio Code is recommended as code editor with ReSharper (perfect for Unreal 
