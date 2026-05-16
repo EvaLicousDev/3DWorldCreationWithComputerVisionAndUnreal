@@ -8,14 +8,14 @@ from pathlib import Path
 from datetime import datetime
 
 ## This script should run when the application request a capture array
-## We weant to send 8 images with various lengths of exposure
+## We want to send 6 HDR images with various lengths of exposure and their normal counter parts 
 
 try:
     camera = HDR_Img_Camera()
     print("Setup complete")
 
-    # 4 HDR
     camera.capture_hdr_set()
+    
     
 except KeyboardInterrupt:
     print("Input interrupted application")
