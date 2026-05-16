@@ -16,6 +16,11 @@ DESIGN SCATCH
 ----------------------------------------------------------------------------------------
 <img width="944" height="511" alt="image" src="https://github.com/user-attachments/assets/883123fd-608f-4026-910c-93dfa06db7ef" />
 
+This repository hosts code related to 3 modular systems that together create a tool in form 
+of a computer vision algorithm, that translates predicted locations of defined colours 
+to 3D coordinates, that Unreal Engine can use to create a 3D world using procedural
+content generation. 
+
 ----------------------------------------------------------------------------------------
 PROJECT STAGE
 ----------------------------------------------------------------------------------------
