@@ -1,0 +1,29 @@
+OpenCV 4.11.0
+OpenCV is used as core component for the project. It is free to use under the Apache 2.0 license available at https://github.com/opencv/opencv/blob/master/LICENSE
+
+OpenCV Python
+Used only in the python scripts used by the Raspberry Pi 5 camera system. https://github.com/opencv/opencv-python/blob/4.x/LICENSE.txt
+
+Picamera2 Python Library
+Used by the pi camera system, licensed under the BSD-Clause 2 license: https://github.com/raspberrypi/picamera2/blob/main/LICENSE 
+
+Unreal Engine 5
+Unreal Engine 5 is used as main component for the game component and free to use for Students at Educators with no revenue limits. https://www.unrealengine.com/license
+
+The Realtime Mesh Component by TriAxis games
+A third-party plugin briefly explored for the implementation of the game. It is open source and licensed under the MIT community license. It can be viewed at https://github.com/TriAxis-Games/RealtimeMeshComponent/blob/master/LICENSE.txt
+
+CMake
+CMake is used as built tool and is distributed under the OSI-approved BSD-3 License
+https://cmake.org/licensing/
+
+Samba 
+Used by the Raspberry Pi 5 to share the image folder with Windows Systems and is licensed under the MIT license
+https://github.com/microsoft/Samba/blob/main/LICENSE
+
+NumPy 
+Used by the python camera scripts
+https://numpy.org/doc/stable/license.html
+
+Predefined Colours by M Hotchin
+Used by the ColourDetector.h class in the computer vision application as alternative to the brick thresholding area. License included in code. Please view “PredefinedColours.h”. Also view https://forum.arduino.cc/t/color-names-for-c-projects/629984
