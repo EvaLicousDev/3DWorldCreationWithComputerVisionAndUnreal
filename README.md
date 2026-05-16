@@ -2,6 +2,8 @@
 COMPUTER VISION TABLETOP RPG MAP CREATOR  -  SETUP GUIDE
 ----------------------------------------------------------------------------------------
 Last updated 16.05.26 (Updated to closer match READ.me submitted for marking)
+Additional images from development and testing available here : https://drive.google.com/drive/u/2/folders/1RrunHnxi9XC2J3ji54-7f3USUNmGu0p3
+Video demos of the UE5 logic available here : https://drive.google.com/drive/u/2/folders/1bVbAZkOVdeuWMLbCwMZmfZq9j3SybT_7
 
 Thank you for reading the set-up guide! This document covers system purpose, architecture
 and technologies, and should enable any reader to navigate the repository & understand how 
