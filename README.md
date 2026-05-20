@@ -185,7 +185,7 @@ If rebuilding this project the following setup is recommended for the raspberry 
         - install python 3 (or latest)
         - install pip install as package manager
             - pip install open cv 2 (python version)
-            - pip install picampere 2
+            - pip install picamera 2
             - pip install flask 
         - install rpi camera packages (previously known as libcamera)
 
